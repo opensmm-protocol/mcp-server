@@ -1,0 +1,17 @@
+{
+  "": "https://modelcontextprotocol.io/schema/server.json",
+  "name": "opensmm-protocol",
+  "version": "1.0.0",
+  "description": "Open protocol and MCP server for decentralized social media growth, engagement distribution, and account farms.",
+  "homepage": "https://opensmm.dev",
+  "repository": "https://github.com/opensmm-protocol/mcp-server",
+  "license": "MIT",
+  "transport": {
+    "type": "streamable-http",
+    "url": "https://api.opensmm.dev/api/mcp"
+  },
+  "capabilities": {
+    "tools": true,
+    "resources": true
+  }
+}
