@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opensmm.dev/spec/v0/schemas/create-quote-request.json",
+  "title": "CreateQuoteRequest",
+  "description": "POST /v0/quotes body / get_quote arguments.",
+  "type": "object",
+  "required": ["serviceId", "quantity"],
+  "additionalProperties": false,
+  "properties": {
+    "serviceId": { "type": "string", "pattern": "^osmm_svc_" },
+    "quantity": { "type": "integer", "minimum": 1 },
+    "link": {
+      "type": "string",
+      "description": "Optional at quote time, mandatory at order time. Quoting with the real link is recommended."
+    },
+    "parameters": {
+      "type": "object",
+      "description": "Extra per-service parameters that affect price (e.g. custom comments count)",
+      "additionalProperties": true
+    }
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opensmm.dev/spec/v0/schemas/service.json",
+  "title": "Service",
+  "description": "A sellable, curated SKU. serviceId is gateway-stable and MUST NOT change when the underlying provider changes.",
+  "type": "object",
+  "required": [
+    "serviceId",
+    "name",
+    "platform",
+    "objective",
+    "rate",
+    "rateBasis",
+    "minQuantity",
+    "maxQuantity",
+    "parameters",
+    "capabilities",
+    "status"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "serviceId": { "type": "string", "pattern": "^osmm_svc_" },
+    "name": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "platform": {
+      "type": "string",
+      "enum": ["telegram", "instagram", "youtube", "tiktok", "x", "vk", "other"]
+    },
+    "objective": {
+      "type": "string",
+      "enum": ["followers", "members", "likes", "views", "reactions", "comments", "other"]
+    },
+    "category": { "type": "string" },
+    "rate": { "$ref": "money.json" },
+    "rateBasis": { "type": "string", "enum": ["PER_1000", "PER_UNIT", "PER_PACKAGE"] },
+    "minQuantity": { "type": "integer", "minimum": 1 },
+    "maxQuantity": { "type": "integer", "minimum": 1 },
+    "qualityTier": { "type": "string", "enum": ["economy", "standard", "premium"] },
+    "parameters": {
+      "type": "array",
+      "description": "Extra order parameters beyond link+quantity (e.g. custom comments). link is always required and is not listed here.",
+      "items": {
+        "type": "object",
+        "required": ["name", "type", "required"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string" },
+          "type": { "type": "string", "enum": ["string", "string_list", "integer", "boolean"] },
+          "required": { "type": "boolean" },
+          "description": { "type": "string" }
+        }
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "required": ["refill", "cancel", "dripfeed"],
+      "additionalProperties": false,
+      "properties": {
+        "refill": { "type": "boolean" },
+        "cancel": { "type": "boolean" },
+        "dripfeed": { "type": "boolean" }
+      }
+    },
+    "status": { "type": "string", "enum": ["ACTIVE", "DISABLED"] }
+  }
+}

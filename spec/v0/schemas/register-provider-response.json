@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opensmm.dev/spec/v0/schemas/register-provider-response.json",
+  "title": "RegisterProviderResponse",
+  "description": "Result of a successful provider registration (§10). Contains no credentials — the apiKey from the request is never echoed.",
+  "type": "object",
+  "required": ["providerKey", "lifecycle", "offersCount", "catalogVersion"],
+  "additionalProperties": false,
+  "properties": {
+    "providerKey": {
+      "type": "string",
+      "description": "Pseudonymous public key assigned to the node, e.g. \"provider-beta\""
+    },
+    "lifecycle": {
+      "type": "string",
+      "enum": ["UNVERIFIED", "ACTIVE", "SUSPENDED"]
+    },
+    "offersCount": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of offers synced into the gateway catalog from the registration healthcheck"
+    },
+    "catalogVersion": {
+      "type": "string",
+      "description": "Catalog version after the sync"
+    }
+  }
+}

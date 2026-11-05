@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opensmm.dev/spec/v0/schemas/quote.json",
+  "title": "Quote",
+  "description": "A priced, expiring offer. Mandatory before ordering. Binds serviceId + quantity + link + amount at a catalogVersion.",
+  "type": "object",
+  "required": [
+    "quoteId",
+    "serviceId",
+    "quantity",
+    "amount",
+    "catalogVersion",
+    "expiresAt",
+    "createdAt",
+    "warnings",
+    "confirmationRequired"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "quoteId": { "type": "string", "pattern": "^osmm_quote_" },
+    "serviceId": { "type": "string", "pattern": "^osmm_svc_" },
+    "quantity": { "type": "integer", "minimum": 1 },
+    "link": { "type": "string", "description": "Target URL/identifier the quote was priced for, if supplied" },
+    "amount": { "$ref": "money.json", "description": "Total sell price for the whole quantity" },
+    "catalogVersion": { "type": "string" },
+    "expiresAt": { "type": "string", "format": "date-time" },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "warnings": { "type": "array", "items": { "type": "string" } },
+    "confirmationRequired": {
+      "type": "boolean",
+      "description": "When true, an agent MUST present the quote to its user and get explicit confirmation before createOrder"
+    }
+  }
+}

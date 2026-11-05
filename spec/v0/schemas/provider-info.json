@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opensmm.dev/spec/v0/schemas/provider-info.json",
+  "title": "ProviderInfo",
+  "description": "Public, pseudonymous view of a connected execution provider. Identity is opt-in: displayName appears only when the provider chose to be publicly listed. Metrics are MEASURED gateway-side observations, never provider self-reports, and are published only with a meaningful sample size.",
+  "type": "object",
+  "required": ["providerKey", "lifecycle", "capabilities", "offersCount", "metrics"],
+  "additionalProperties": false,
+  "properties": {
+    "providerKey": {
+      "type": "string",
+      "description": "Stable pseudonymous identifier assigned by the gateway, e.g. \"provider-alpha\""
+    },
+    "displayName": {
+      "type": "string",
+      "description": "Present only when the provider opted in to public listing"
+    },
+    "lifecycle": {
+      "type": "string",
+      "enum": ["UNVERIFIED", "ACTIVE", "SUSPENDED"],
+      "description": "Node lifecycle state (§10). UNVERIFIED nodes are in sandbox; SUSPENDED nodes are excluded from routing."
+    },
+    "capabilities": {
+      "type": "object",
+      "required": ["cancel", "refill", "batchStatus"],
+      "additionalProperties": false,
+      "properties": {
+        "cancel": { "type": "boolean" },
+        "refill": { "type": "boolean" },
+        "batchStatus": { "type": "boolean" }
+      }
+    },
+    "offersCount": { "type": "integer", "minimum": 0 },
+    "metrics": {
+      "type": "object",
+      "required": ["sampleSize"],
+      "additionalProperties": false,
+      "description": "Gateway-measured execution quality. Optional fields are omitted until sampleSize is sufficient; sampleSize is always shown so agents can judge confidence.",
+      "properties": {
+        "sampleSize": { "type": "integer", "minimum": 0 },
+        "measuredStartP50Sec": { "type": "number", "minimum": 0 },
+        "measuredCompletionP50Sec": { "type": "number", "minimum": 0 },
+        "deliveredRatio": { "type": "number", "minimum": 0, "maximum": 1 },
+        "errorRate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "retentionD7": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    }
+  }
+}

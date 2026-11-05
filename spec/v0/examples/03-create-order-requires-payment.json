@@ -1,0 +1,31 @@
+{
+  "request": "POST /v0/orders",
+  "requestHeaders": { "Idempotency-Key": "agent-order-00042" },
+  "requestBody": {
+    "quoteId": "osmm_quote_01JEXAMPLE0000000000000000",
+    "link": "https://t.me/example_channel",
+    "clientReference": "agent-order-00042"
+  },
+  "responseStatus": 402,
+  "response": {
+    "orderId": "osmm_order_01JEXAMPLE1111111111111111",
+    "quoteId": "osmm_quote_01JEXAMPLE0000000000000000",
+    "clientReference": "agent-order-00042",
+    "serviceId": "osmm_svc_tg_members_std",
+    "link": "https://t.me/example_channel",
+    "quantity": 1000,
+    "parameters": {},
+    "amount": { "value": "2.412000", "currency": "USDC" },
+    "paymentStatus": "REQUIRES_PAYMENT",
+    "executionStatus": "NOT_STARTED",
+    "paymentIntentId": "osmm_pi_01JEXAMPLE2222222222222222",
+    "paymentRequirements": [
+      {
+        "method": "mock",
+        "amount": { "value": "2.412000", "currency": "USDC" }
+      }
+    ],
+    "createdAt": "2026-11-05T00:16:00Z",
+    "updatedAt": "2026-11-05T00:16:00Z"
+  }
+}

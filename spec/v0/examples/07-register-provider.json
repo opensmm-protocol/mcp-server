@@ -1,0 +1,18 @@
+{
+  "request": "POST /v0/providers",
+  "requestBody": {
+    "adapter": "smm-v2",
+    "endpoint": "https://panel-node-7.example/api/v2",
+    "apiKey": "pk_live_REDACTED_IN_EXAMPLE",
+    "profile": "standard",
+    "publiclyListed": false,
+    "payoutAddress": "0x8ba1f109551bD432803012645Ac136ddd64DBA72"
+  },
+  "response": {
+    "providerKey": "provider-beta",
+    "lifecycle": "ACTIVE",
+    "offersCount": 214,
+    "catalogVersion": "2026-11-05T12:00:00.000Z"
+  },
+  "comment": "The gateway validated the endpoint (SSRF guard), healthchecked the API by listing its offers, synced 214 offers into the catalog and assigned the pseudonymous key provider-beta. The apiKey is never returned. Re-registering the same endpoint returns the same providerKey."
+}

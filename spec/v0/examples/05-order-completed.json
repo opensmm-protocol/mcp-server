@@ -1,0 +1,18 @@
+{
+  "request": "GET /v0/orders/osmm_order_01JEXAMPLE1111111111111111",
+  "response": {
+    "orderId": "osmm_order_01JEXAMPLE1111111111111111",
+    "quoteId": "osmm_quote_01JEXAMPLE0000000000000000",
+    "clientReference": "agent-order-00042",
+    "serviceId": "osmm_svc_tg_members_std",
+    "link": "https://t.me/example_channel",
+    "quantity": 1000,
+    "parameters": {},
+    "amount": { "value": "2.412000", "currency": "USDC" },
+    "paymentStatus": "SETTLED",
+    "executionStatus": "COMPLETED",
+    "paymentIntentId": "osmm_pi_01JEXAMPLE2222222222222222",
+    "createdAt": "2026-11-05T00:16:00Z",
+    "updatedAt": "2026-11-05T00:42:00Z"
+  }
+}

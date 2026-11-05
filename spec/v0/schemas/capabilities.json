@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opensmm.dev/spec/v0/schemas/capabilities.json",
+  "title": "Capabilities",
+  "type": "object",
+  "required": [
+    "protocolVersion",
+    "commands",
+    "paymentMethods",
+    "features",
+    "catalogVersion"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "protocolVersion": { "type": "string", "const": "0.1.0-draft" },
+    "commands": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "getCapabilities",
+          "searchServices",
+          "getService",
+          "getQuote",
+          "createOrder",
+          "getOrder",
+          "cancelOrder",
+          "requestRefill",
+          "listProviders",
+          "registerProvider"
+        ]
+      }
+    },
+    "paymentMethods": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["x402", "ton", "cryptobot", "mock"] }
+    },
+    "features": {
+      "type": "object",
+      "required": ["cancel", "refill"],
+      "additionalProperties": false,
+      "properties": {
+        "cancel": { "type": "boolean" },
+        "refill": { "type": "boolean" }
+      }
+    },
+    "catalogVersion": { "type": "string" }
+  }
+}

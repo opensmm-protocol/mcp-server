@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opensmm.dev/spec/v0/schemas/payment-intent.json",
+  "title": "PaymentIntent",
+  "description": "The payment for an order, decoupled from the order lifecycle so new payment rails do not change it.",
+  "type": "object",
+  "required": [
+    "paymentIntentId",
+    "orderId",
+    "amount",
+    "status",
+    "requirements",
+    "createdAt",
+    "updatedAt"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "paymentIntentId": { "type": "string", "pattern": "^osmm_pi_" },
+    "orderId": { "type": "string", "pattern": "^osmm_order_" },
+    "amount": { "$ref": "money.json" },
+    "status": {
+      "type": "string",
+      "enum": [
+        "REQUIRES_PAYMENT",
+        "VERIFYING",
+        "SETTLEMENT_PENDING",
+        "SETTLED",
+        "FAILED",
+        "REFUNDING",
+        "REFUNDED"
+      ]
+    },
+    "requirements": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "payment-requirement.json" }
+    },
+    "settledWith": {
+      "type": "string",
+      "enum": ["x402", "ton", "cryptobot", "mock"],
+      "description": "The method actually used, once settled"
+    },
+    "txHash": { "type": "string", "description": "On-chain transaction hash when applicable" },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "updatedAt": { "type": "string", "format": "date-time" }
+  }
+}

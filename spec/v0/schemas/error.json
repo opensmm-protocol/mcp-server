@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opensmm.dev/spec/v0/schemas/error.json",
+  "title": "Error",
+  "description": "Machine-readable error. REST: application/problem+json-compatible body with matching HTTP status. MCP: isError=true with this JSON in structuredContent.",
+  "type": "object",
+  "required": ["error"],
+  "additionalProperties": false,
+  "properties": {
+    "error": {
+      "type": "object",
+      "required": ["code", "message"],
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "VALIDATION_FAILED",
+            "NOT_FOUND",
+            "SERVICE_UNAVAILABLE",
+            "QUOTE_EXPIRED",
+            "QUOTE_MISMATCH",
+            "PAYMENT_REQUIRED",
+            "SETTLEMENT_PENDING",
+            "SUBMISSION_UNKNOWN",
+            "PROVIDER_REJECTED",
+            "POLICY_DENIED",
+            "IDEMPOTENCY_CONFLICT",
+            "REFUND_REQUIRED",
+            "INTERNAL"
+          ]
+        },
+        "message": { "type": "string" },
+        "details": { "type": "object", "additionalProperties": true }
+      }
+    }
+  }
+}

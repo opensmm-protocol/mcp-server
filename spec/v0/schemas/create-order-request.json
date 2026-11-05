@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opensmm.dev/spec/v0/schemas/create-order-request.json",
+  "title": "CreateOrderRequest",
+  "description": "POST /v0/orders body / create_order arguments. REST additionally accepts Idempotency-Key header; clientReference is its MCP equivalent and both map to the same key.",
+  "type": "object",
+  "required": ["quoteId", "link", "clientReference"],
+  "additionalProperties": false,
+  "properties": {
+    "quoteId": { "type": "string", "pattern": "^osmm_quote_" },
+    "link": { "type": "string", "minLength": 1 },
+    "quantity": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Defaults to the quoted quantity; any other value fails with QUOTE_MISMATCH"
+    },
+    "parameters": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Must satisfy the service's parameter schema"
+    },
+    "clientReference": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Idempotency key chosen by the agent"
+    }
+  }
+}

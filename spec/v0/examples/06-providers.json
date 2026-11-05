@@ -1,0 +1,15 @@
+{
+  "request": "GET /v0/providers",
+  "response": {
+    "providers": [
+      {
+        "providerKey": "provider-alpha",
+        "lifecycle": "ACTIVE",
+        "capabilities": { "cancel": true, "refill": true, "batchStatus": true },
+        "offersCount": 6,
+        "metrics": { "sampleSize": 0 }
+      }
+    ]
+  },
+  "comment": "displayName is absent: this provider has not opted in to public listing. metrics carries only sampleSize until enough gateway-measured orders exist."
+}

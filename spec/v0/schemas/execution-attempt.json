@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opensmm.dev/spec/v0/schemas/execution-attempt.json",
+  "title": "ExecutionAttempt",
+  "description": "One submission of an order to a provider. A new attempt per submission; ambiguous outcomes become SUBMISSION_UNKNOWN and are never blindly retried.",
+  "type": "object",
+  "required": ["attemptId", "orderId", "providerId", "status", "startedAt"],
+  "additionalProperties": false,
+  "properties": {
+    "attemptId": { "type": "string", "pattern": "^osmm_att_" },
+    "orderId": { "type": "string", "pattern": "^osmm_order_" },
+    "providerId": { "type": "string" },
+    "status": {
+      "type": "string",
+      "enum": ["SUBMITTING", "SUBMITTED", "SUBMISSION_UNKNOWN", "FAILED"]
+    },
+    "externalExecutionId": {
+      "type": "string",
+      "description": "Provider-side order id, once known. Always a string."
+    },
+    "error": { "type": "string" },
+    "startedAt": { "type": "string", "format": "date-time" },
+    "finishedAt": { "type": "string", "format": "date-time" }
+  }
+}

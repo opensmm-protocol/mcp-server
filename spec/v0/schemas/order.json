@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opensmm.dev/spec/v0/schemas/order.json",
+  "title": "Order",
+  "description": "The purchased execution. paymentStatus and executionStatus are independent and MUST NOT be merged into one status.",
+  "type": "object",
+  "required": [
+    "orderId",
+    "quoteId",
+    "clientReference",
+    "serviceId",
+    "link",
+    "quantity",
+    "parameters",
+    "amount",
+    "paymentStatus",
+    "executionStatus",
+    "createdAt",
+    "updatedAt"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "orderId": { "type": "string", "pattern": "^osmm_order_" },
+    "quoteId": { "type": "string", "pattern": "^osmm_quote_" },
+    "clientReference": {
+      "type": "string",
+      "description": "Client-supplied idempotency key (REST: Idempotency-Key header)"
+    },
+    "serviceId": { "type": "string", "pattern": "^osmm_svc_" },
+    "link": { "type": "string" },
+    "quantity": { "type": "integer", "minimum": 1 },
+    "parameters": {
+      "type": "object",
+      "description": "Extra per-service parameters (e.g. {\"comments\": [...]})",
+      "additionalProperties": true
+    },
+    "amount": { "$ref": "money.json" },
+    "paymentStatus": {
+      "type": "string",
+      "enum": [
+        "NOT_REQUIRED",
+        "REQUIRES_PAYMENT",
+        "VERIFYING",
+        "SETTLEMENT_PENDING",
+        "SETTLED",
+        "FAILED",
+        "REFUNDING",
+        "REFUNDED"
+      ]
+    },
+    "executionStatus": {
+      "type": "string",
+      "enum": [
+        "NOT_STARTED",
+        "SUBMITTING",
+        "SUBMISSION_UNKNOWN",
+        "PENDING",
+        "IN_PROGRESS",
+        "PARTIAL",
+        "COMPLETED",
+        "CANCELED",
+        "ERROR",
+        "UNKNOWN"
+      ]
+    },
+    "paymentIntentId": { "type": "string", "pattern": "^osmm_pi_" },
+    "paymentRequirements": {
+      "type": "array",
+      "description": "Present while paymentStatus is REQUIRES_PAYMENT",
+      "items": { "$ref": "payment-requirement.json" }
+    },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "updatedAt": { "type": "string", "format": "date-time" }
+  }
+}

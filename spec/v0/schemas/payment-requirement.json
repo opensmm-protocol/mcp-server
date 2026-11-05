@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opensmm.dev/spec/v0/schemas/payment-requirement.json",
+  "title": "PaymentRequirement",
+  "description": "One concrete way to pay a PaymentIntent. Several may be offered; the payer chooses one.",
+  "type": "object",
+  "required": ["method", "amount"],
+  "additionalProperties": false,
+  "properties": {
+    "method": { "type": "string", "enum": ["x402", "ton", "cryptobot", "mock"] },
+    "network": {
+      "type": "string",
+      "description": "CAIP-2 style network id, e.g. \"eip155:8453\" (Base), \"ton\". Omitted for mock."
+    },
+    "asset": { "type": "string", "description": "Asset code, e.g. USDC, TON" },
+    "amount": { "$ref": "money.json" },
+    "payTo": { "type": "string", "description": "Destination address / invoice target" },
+    "memo": { "type": "string", "description": "Required payment memo/comment when applicable (TON)" },
+    "expiresAt": { "type": "string", "format": "date-time" }
+  }
+}

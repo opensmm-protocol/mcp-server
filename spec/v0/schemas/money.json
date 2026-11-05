@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opensmm.dev/spec/v0/schemas/money.json",
+  "title": "Money",
+  "description": "Decimal amount as string. Never a float. Currency is ISO 4217 or PROVIDER_CREDITS (provider-internal units, requires creditToUsdRate context).",
+  "type": "object",
+  "required": ["value", "currency"],
+  "additionalProperties": false,
+  "properties": {
+    "value": {
+      "type": "string",
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+      "description": "Decimal string, e.g. \"2.412000\""
+    },
+    "currency": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 20,
+      "description": "ISO 4217 code (USD, USDC is an asset code allowed here) or PROVIDER_CREDITS"
+    }
+  }
+}

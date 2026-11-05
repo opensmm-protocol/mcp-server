@@ -1,0 +1,24 @@
+{
+  "request": "GET /v0/services?query=members&platform=telegram",
+  "response": {
+    "services": [
+      {
+        "serviceId": "osmm_svc_tg_members_std",
+        "name": "Telegram Channel Members — Standard",
+        "description": "Real-looking members for public Telegram channels. Start 0-1h, speed ~5k/day.",
+        "platform": "telegram",
+        "objective": "members",
+        "category": "Telegram / Members",
+        "rate": { "value": "2.412000", "currency": "USDC" },
+        "rateBasis": "PER_1000",
+        "minQuantity": 100,
+        "maxQuantity": 50000,
+        "qualityTier": "standard",
+        "parameters": [],
+        "capabilities": { "refill": true, "cancel": true, "dripfeed": false },
+        "status": "ACTIVE"
+      }
+    ],
+    "catalogVersion": "2026-11-05T00:00:00Z"
+  }
+}

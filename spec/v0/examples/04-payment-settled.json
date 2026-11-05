@@ -1,0 +1,19 @@
+{
+  "request": "POST /v0/payments/osmm_pi_01JEXAMPLE2222222222222222/settle",
+  "comment": "mock rail, development only",
+  "response": {
+    "paymentIntentId": "osmm_pi_01JEXAMPLE2222222222222222",
+    "orderId": "osmm_order_01JEXAMPLE1111111111111111",
+    "amount": { "value": "2.412000", "currency": "USDC" },
+    "status": "SETTLED",
+    "requirements": [
+      {
+        "method": "mock",
+        "amount": { "value": "2.412000", "currency": "USDC" }
+      }
+    ],
+    "settledWith": "mock",
+    "createdAt": "2026-11-05T00:16:00Z",
+    "updatedAt": "2026-11-05T00:16:30Z"
+  }
+}

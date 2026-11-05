@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opensmm.dev/spec/v0/schemas/execution-receipt.json",
+  "title": "ExecutionReceipt",
+  "description": "An observation of provider-side execution state. Evidence level 1 (Provider Report) in the OpenSMM evidence model.",
+  "type": "object",
+  "required": [
+    "receiptId",
+    "orderId",
+    "providerId",
+    "externalExecutionId",
+    "status",
+    "observedAt"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "receiptId": { "type": "string", "pattern": "^osmm_rcpt_" },
+    "orderId": { "type": "string", "pattern": "^osmm_order_" },
+    "providerId": { "type": "string" },
+    "externalExecutionId": { "type": "string" },
+    "status": {
+      "type": "string",
+      "enum": [
+        "PENDING",
+        "IN_PROGRESS",
+        "PARTIAL",
+        "COMPLETED",
+        "CANCELED",
+        "ERROR",
+        "UNKNOWN"
+      ]
+    },
+    "rawStatus": {
+      "type": "string",
+      "description": "Provider's own status string, preserved for audit"
+    },
+    "startCount": { "type": "integer", "minimum": 0 },
+    "remains": { "type": "integer", "minimum": 0 },
+    "delivered": { "type": "integer", "minimum": 0 },
+    "observedAt": { "type": "string", "format": "date-time" }
+  }
+}

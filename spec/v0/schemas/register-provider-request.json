@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opensmm.dev/spec/v0/schemas/register-provider-request.json",
+  "title": "RegisterProviderRequest",
+  "description": "Provider self-registration request (§10). The apiKey is used only to call the provider's API and MUST never appear in any protocol response, log line or public listing.",
+  "type": "object",
+  "required": ["adapter", "endpoint", "apiKey"],
+  "additionalProperties": false,
+  "properties": {
+    "adapter": {
+      "type": "string",
+      "enum": ["smm-v2", "rest-v1"],
+      "description": "API dialect of the provider: classic key+action panel API (smm-v2) or reseller-style REST v1 (Bearer auth, /services + /orders)"
+    },
+    "endpoint": {
+      "type": "string",
+      "format": "uri",
+      "description": "Public https base URL of the provider API. Must pass the SSRF guard (§10.2)."
+    },
+    "apiKey": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Provider-side credential. Never returned by the protocol."
+    },
+    "profile": {
+      "type": "string",
+      "description": "smm-v2 only: behavior profile name (default 'standard')"
+    },
+    "displayName": {
+      "type": "string",
+      "maxLength": 80,
+      "description": "Human-readable name; published only when publiclyListed is true"
+    },
+    "publiclyListed": {
+      "type": "boolean",
+      "description": "Opt in to publishing displayName on the public provider showcase"
+    },
+    "payoutAddress": {
+      "type": "string",
+      "description": "Direct-settlement address (§8). Becomes the payTo of this provider's payment requirements."
+    }
+  }
+}
