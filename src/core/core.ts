@@ -8,6 +8,7 @@ import type { Catalog, CatalogEntry } from "./catalog.ts";
 import { providerOfferToCatalogEntry } from "./catalog-map.ts";
 import { OpenSmmError } from "./errors.ts";
 import { newId, nowIso } from "./ids.ts";
+import { MetricsRecorder } from "./metrics.ts";
 import { quoteAmount } from "./money.ts";
 import { PaymentRejectedError, type PaymentRail } from "./payment-rail.ts";
 import { ProviderRegistry, type ProviderNode } from "./provider-registry.ts";
@@ -78,6 +79,14 @@ interface IdempotencyRecord {
 
 interface ExecutionRecord {
   externalExecutionId: string;
+  /** Epoch ms when the provider accepted the submission. */
+  submittedAt: number;
+  /** First poll that observed delivery (status left PENDING). */
+  firstProgressAt?: number;
+  /** Terminal observation timestamp; also guards double-counting metrics. */
+  completedAt?: number;
+  /** High-water mark of delivered units seen across polls. */
+  maxDelivered: number;
   latestSnapshot?: ExecutionSnapshot;
 }
 
@@ -100,6 +109,8 @@ export interface CoreOptions {
   providerFactory?: ProviderFactory;
   /** SSRF guard options for provider registration (allowPrivate is dev-only). */
   ssrf?: SsrfGuardOptions;
+  /** Gateway-measured provider metrics (spec/v0 §9). A shared default is created when omitted. */
+  metrics?: MetricsRecorder;
   quoteTtlMs?: number;
 }
 
@@ -109,13 +120,14 @@ export interface SettleOptions {
 }
 
 export class OpenSmmCore {
-  private readonly catalog: Catalog;
-  private readonly registry = new ProviderRegistry();
+  readonly catalog: Catalog;
+  readonly registry = new ProviderRegistry();
   private readonly paymentMethods: PaymentMethod[];
   private readonly rails = new Map<PaymentMethod, PaymentRail>();
   private readonly providerFactory?: ProviderFactory;
   private readonly ssrf: SsrfGuardOptions;
   private readonly quoteTtlMs: number;
+  readonly metrics: MetricsRecorder;
 
   private readonly quotes = new Map<string, QuoteRecord>();
   private readonly orders = new Map<string, Order>();
@@ -148,6 +160,7 @@ export class OpenSmmCore {
     }
     if (options.providerFactory) this.providerFactory = options.providerFactory;
     this.ssrf = options.ssrf ?? {};
+    this.metrics = options.metrics ?? new MetricsRecorder();
     this.quoteTtlMs = options.quoteTtlMs ?? 15 * 60 * 1000;
   }
 
@@ -183,9 +196,8 @@ export class OpenSmmCore {
         offersCount: this.catalog
           .list()
           .filter((e) => e.providerId === node.providerId && e.service.status === "ACTIVE").length,
-        // Gateway-measured metrics arrive with real order history; until then we
-        // publish only the sample size, never a fabricated success rate.
-        metrics: { sampleSize: 0 },
+        // Gateway-measured only (spec/v0 §9); sparse until the sample justifies it.
+        metrics: this.metrics.snapshot(node.providerId),
       });
     }
     return { providers };
@@ -273,6 +285,8 @@ export class OpenSmmCore {
     const text = query.query?.trim().toLowerCase();
     const services = this.catalog
       .list()
+      // SUSPENDED nodes are excluded from routing and search (spec/v0 §10.1).
+      .filter((e) => this.registry.get(e.providerId)?.lifecycle !== "SUSPENDED")
       .map((e) => e.service)
       .filter((s) => s.status === "ACTIVE")
       .filter((s) => (query.platform ? s.platform === query.platform : true))
@@ -301,6 +315,10 @@ export class OpenSmmCore {
     const service = entry.service;
     if (service.status !== "ACTIVE") {
       throw new OpenSmmError("SERVICE_UNAVAILABLE", `service is disabled: ${service.serviceId}`);
+    }
+    // A SUSPENDED node is out of routing (spec/v0 §10.1): no new quotes on it.
+    if (this.registry.get(entry.providerId)?.lifecycle === "SUSPENDED") {
+      throw new OpenSmmError("SERVICE_UNAVAILABLE", `service is temporarily unavailable: ${service.serviceId}`);
     }
     this.validateQuantity(service, input.quantity);
     const parameters = input.parameters ?? {};
@@ -664,11 +682,17 @@ export class OpenSmmCore {
         quantity: order.quantity,
         parameters: order.parameters,
       });
-      this.executions.set(order.orderId, { externalExecutionId: ref.externalExecutionId });
+      this.executions.set(order.orderId, {
+        externalExecutionId: ref.externalExecutionId,
+        submittedAt: Date.now(),
+        maxDelivered: 0,
+      });
+      this.metrics.recordSubmission(entry.providerId);
       this.setExecutionStatus(order, "PENDING");
     } catch (err) {
       if (err instanceof ProviderRejectedError) {
         // Definitive refusal: execution ERROR, payment heads to refund.
+        this.metrics.recordRejection(entry.providerId, order.quantity);
         this.setExecutionStatus(order, "ERROR");
         this.setPaymentStatus(order, "REFUNDING");
         return;
@@ -684,6 +708,18 @@ export class OpenSmmCore {
     }
   }
 
+  /** Poll every in-flight execution; returns the number of orders refreshed. */
+  async refreshActiveOrders(): Promise<number> {
+    let refreshed = 0;
+    for (const order of this.orders.values()) {
+      if (["PENDING", "IN_PROGRESS", "PARTIAL"].includes(order.executionStatus)) {
+        await this.refreshExecution(order);
+        refreshed += 1;
+      }
+    }
+    return refreshed;
+  }
+
   private async refreshExecution(order: Order): Promise<void> {
     const exec = this.executions.get(order.orderId);
     if (!exec || TERMINAL_EXECUTION.has(order.executionStatus)) {
@@ -696,8 +732,29 @@ export class OpenSmmCore {
       const entry = this.requireEntry(order.serviceId);
       const snapshot = await this.providerFor(entry.providerId).getExecution(exec.externalExecutionId);
       exec.latestSnapshot = snapshot;
+      const now = Date.now();
+      // Metrics: first progress, delivery high-water mark, terminal outcome.
+      if (
+        exec.firstProgressAt === undefined &&
+        (snapshot.status === "IN_PROGRESS" || snapshot.status === "PARTIAL" || snapshot.status === "COMPLETED")
+      ) {
+        exec.firstProgressAt = now;
+        this.metrics.recordStart(entry.providerId, (now - exec.submittedAt) / 1000);
+      }
+      if (snapshot.delivered !== undefined) {
+        exec.maxDelivered = Math.max(exec.maxDelivered, snapshot.delivered);
+      }
       if (snapshot.status !== order.executionStatus) {
         this.setExecutionStatus(order, snapshot.status);
+      }
+      if (exec.completedAt === undefined && TERMINAL_EXECUTION.has(snapshot.status)) {
+        exec.completedAt = now;
+        const delivered = snapshot.delivered ?? exec.maxDelivered;
+        this.metrics.recordTerminal(entry.providerId, snapshot.status as "COMPLETED" | "CANCELED" | "ERROR", {
+          orderedUnits: order.quantity,
+          deliveredUnits: delivered,
+          completionLatencySec: (now - exec.submittedAt) / 1000,
+        });
       }
     } catch {
       // Polling failure never moves the order backwards; keep last known status.

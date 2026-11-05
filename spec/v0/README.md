@@ -246,7 +246,28 @@ UNVERIFIED → ACTIVE → SUSPENDED
   Gateways MAY cap order volume for such nodes (anti exit-scam throttle).
 - `ACTIVE`: routable.
 - `SUSPENDED`: excluded from routing and search; reactivation is a gateway
-  policy decision.
+  policy decision. In-flight orders of a suspended node keep polling to
+  completion — suspension stops *new* business, not existing obligations.
+
+### 10.4 Supervision (catalog sync and the circuit breaker)
+
+A gateway supervises its nodes continuously; registration is not a one-time
+check:
+
+- **Catalog sync.** Each node's offers are re-listed on an interval and its
+  catalog entries are replaced (`catalogVersion` changes). Prices and
+  availability drift; the catalog MUST follow the provider, not the
+  registration snapshot.
+- **Circuit breaker.** After N consecutive sync failures (this implementation:
+  3) the node moves `ACTIVE → SUSPENDED` automatically. The first successful
+  sync resets the counter and moves it back to `ACTIVE`. Failure of one node
+  never delays the sync of others.
+- **Order polling.** In-flight orders (`PENDING` / `IN_PROGRESS` / `PARTIAL`)
+  are polled in the background on an interval, independent of client
+  `getOrder` calls. Polling failures never move an order backwards.
+- **Metrics feed.** Every observed transition (submission, first progress,
+  terminal outcome, delivered units) feeds the gateway-measured metrics of
+  §9 — they are the only source of provider reputation.
 
 ### 10.2 SSRF guard (mandatory)
 

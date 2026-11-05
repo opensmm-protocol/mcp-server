@@ -10,11 +10,15 @@
  *   OPENSMM_PROVIDER_LISTED_NAME — opt-in public displayName (spec/v0 §9)
  *   OPENSMM_PROVIDER_PAYOUT      — direct-settlement payTo address (spec/v0 §8)
  *   OPENSMM_ALLOW_PRIVATE_ENDPOINTS=1 — dev-only SSRF escape hatch
+ *   OPENSMM_SYNC_INTERVAL_MS / OPENSMM_POLL_INTERVAL_MS — supervision cadence
+ *   OPENSMM_SUPERVISOR=0       — disable background supervision (default: on
+ *                                for live providers, off for the mock stack)
  */
 
 import { InMemoryCatalog } from "./core/catalog.ts";
 import { OpenSmmCore, type CoreOptions } from "./core/core.ts";
 import type { OpenSmmProvider } from "./core/provider-spi.ts";
+import { NodeSupervisor } from "./core/supervisor.ts";
 import { MockProvider } from "./adapters/providers/mock/index.ts";
 import { MOCK_CATALOG_VERSION, mockCatalogEntries } from "./adapters/providers/mock/seed.ts";
 import { RestV1Provider } from "./adapters/providers/rest-v1/index.ts";
@@ -24,11 +28,13 @@ import { defaultProviderFactory } from "./adapters/providers/factory.ts";
 export interface DevStack {
   core: OpenSmmCore;
   provider: MockProvider;
+  supervisor: NodeSupervisor;
 }
 
 export interface Stack {
   core: OpenSmmCore;
   provider: OpenSmmProvider;
+  supervisor: NodeSupervisor;
 }
 
 function coreOptionsFromEnv(): Pick<CoreOptions, "providerFactory" | "ssrf"> {
@@ -47,7 +53,13 @@ export function createDevStack(): DevStack {
     paymentMethods: ["mock"],
     ...coreOptionsFromEnv(),
   });
-  return { core, provider };
+  // The mock stack is for local dev and tests: supervisor exists but is not started.
+  const supervisor = new NodeSupervisor({
+    registry: core.registry,
+    catalog: core.catalog,
+    pollActiveOrders: () => core.refreshActiveOrders(),
+  });
+  return { core, provider, supervisor };
 }
 
 export async function createStackFromEnv(
@@ -80,5 +92,20 @@ export async function createStackFromEnv(
     ...coreOptionsFromEnv(),
     ...overrides,
   });
-  return { core, provider };
+  const supervisor = new NodeSupervisor({
+    registry: core.registry,
+    catalog: core.catalog,
+    pollActiveOrders: () => core.refreshActiveOrders(),
+    ...(process.env.OPENSMM_SYNC_INTERVAL_MS
+      ? { syncIntervalMs: Number(process.env.OPENSMM_SYNC_INTERVAL_MS) }
+      : {}),
+    ...(process.env.OPENSMM_POLL_INTERVAL_MS
+      ? { pollIntervalMs: Number(process.env.OPENSMM_POLL_INTERVAL_MS) }
+      : {}),
+  });
+  // Live provider: catalog drifts, nodes degrade — supervise by default.
+  if (process.env.OPENSMM_SUPERVISOR !== "0") {
+    supervisor.start();
+  }
+  return { core, provider, supervisor };
 }
