@@ -15,6 +15,7 @@ export interface ProviderCapabilities {
 export interface ProviderOffer {
   externalServiceId: string;
   name: string;
+  description?: string;
   category?: string;
   /** Decimal-string rate in `currency`, interpreted per `rateBasis`. */
   rate: string;

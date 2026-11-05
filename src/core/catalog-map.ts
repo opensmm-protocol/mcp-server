@@ -20,10 +20,10 @@ const PLATFORM_KEYWORDS: [RegExp, Platform][] = [
 const OBJECTIVE_KEYWORDS: [RegExp, Objective][] = [
   [/member|subscriber/i, "members"],
   [/follower/i, "followers"],
-  [/like/i, "likes"],
-  [/view|watch|impression/i, "views"],
-  [/reaction/i, "reactions"],
-  [/comment/i, "comments"],
+  [/like|лайк/i, "likes"],
+  [/view|watch|impression|просмотр/i, "views"],
+  [/reaction|реакци/i, "reactions"],
+  [/comment|комментар/i, "comments"],
 ];
 
 export function inferPlatform(text: string): Platform {
@@ -33,7 +33,9 @@ export function inferPlatform(text: string): Platform {
   return "other";
 }
 
-export function inferObjective(text: string): Objective {
+export function inferObjective(text: string, platform?: Platform): Objective {
+  // RU catalogs label both Telegram members and site followers as «подписчики».
+  if (/подписчик/i.test(text)) return platform === "telegram" ? "members" : "followers";
   for (const [re, objective] of OBJECTIVE_KEYWORDS) {
     if (re.test(text)) return objective;
   }
@@ -42,14 +44,16 @@ export function inferObjective(text: string): Objective {
 
 export function providerOfferToCatalogEntry(offer: ProviderOffer, providerId: string): CatalogEntry {
   const haystack = `${offer.category ?? ""} ${offer.name}`;
+  const platform = inferPlatform(haystack);
   return {
     providerId,
     externalServiceId: offer.externalServiceId,
     service: {
       serviceId: `osmm_svc_${providerId}_${offer.externalServiceId}`,
       name: offer.name,
-      platform: inferPlatform(haystack),
-      objective: inferObjective(haystack),
+      ...(offer.description ? { description: offer.description } : {}),
+      platform,
+      objective: inferObjective(haystack, platform),
       ...(offer.category !== undefined ? { category: offer.category } : {}),
       rate: { value: offer.rate, currency: offer.currency },
       rateBasis: offer.rateBasis,

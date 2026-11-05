@@ -7,6 +7,7 @@
 > gateway.
 
 Site: https://opensmm.dev
+Catalog: https://opensmm.dev/catalog/ (live, human-readable mirror of /v0/services)
 Source: https://github.com/opensmm-protocol/mcp-server (MIT)
 
 ## Key facts for agents

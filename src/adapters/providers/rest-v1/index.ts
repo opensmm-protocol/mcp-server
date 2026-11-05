@@ -172,10 +172,11 @@ export class RestV1Provider implements OpenSmmProvider {
     if (id === undefined || id === null) {
       throw new Error(`rest-v1: service entry without id: ${JSON.stringify(raw).slice(0, 200)}`);
     }
-    const description = typeof raw.description === "string" ? raw.description : "";
+    const description = typeof raw.description === "string" ? raw.description.trim() : "";
     return {
       externalServiceId: String(id),
-      name: String(raw.name ?? `#${id}`) + (description ? ` — ${description.slice(0, 120)}` : ""),
+      name: String(raw.name ?? `#${id}`),
+      ...(description ? { description } : {}),
       ...(raw.category !== undefined ? { category: String(raw.category) } : {}),
       rate: String(raw.rate ?? "0"),
       rateBasis: "PER_1000",

@@ -451,6 +451,54 @@ h2 {
 .footer-links a { color: var(--muted); }
 .footer-links a:hover { color: var(--ink); text-decoration: none; }
 
+/* ---------- catalog ---------- */
+
+.crumbs { font-size: 14px; color: var(--muted); margin-bottom: 20px; display: flex; gap: 8px; flex-wrap: wrap; }
+.crumb-sep { color: var(--rule); }
+
+.catalog-hero { border-top: none; padding: 56px 0 40px; }
+.catalog-hero h1 { letter-spacing: -0.02em; }
+.catalog-body { padding: 0 0 72px; border-top: none; }
+
+.hub-list { list-style: none; margin-top: 32px; border-top: 1px solid var(--rule); }
+.hub-item {
+  display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap;
+  padding: 14px 0; border-bottom: 1px solid var(--rule);
+}
+.hub-name { font-weight: 700; font-size: 18px; color: var(--ink); min-width: 160px; }
+.hub-name:hover { color: var(--accent-ink); text-decoration: none; }
+.hub-count { font-family: var(--mono); font-size: 13px; color: var(--muted); }
+.hub-links { font-size: 14px; color: var(--muted); }
+
+.cat-nav { font-size: 15px; color: var(--muted); margin-top: 12px; }
+
+.cat-heading {
+  font-size: 20px; letter-spacing: -0.01em;
+  margin: 40px 0 12px; display: flex; align-items: baseline; gap: 10px;
+}
+.cat-count { font-family: var(--mono); font-size: 13px; color: var(--muted); font-weight: 400; }
+
+.table-scroll { overflow-x: auto; }
+.cat-table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+.cat-table th {
+  text-align: left; font-weight: 500; color: var(--muted); font-size: 13px;
+  border-bottom: 1px solid var(--ink); padding: 6px 12px 6px 0;
+}
+.cat-table td { border-bottom: 1px solid var(--rule); padding: 8px 12px 8px 0; vertical-align: top; }
+.cat-table .num, .cat-table th.num { text-align: right; font-family: var(--mono); font-size: 13px; white-space: nowrap; }
+.svc-name { max-width: 520px; }
+
+.badge {
+  display: inline-block; font-family: var(--mono); font-size: 11px;
+  padding: 1px 7px; border-radius: 999px; margin-right: 4px; white-space: nowrap;
+}
+.badge-ok { color: var(--ok); border: 1px solid var(--ok); }
+
+@media (max-width: 700px) {
+  .svc-name { max-width: none; }
+  .hub-name { min-width: 0; }
+}
+
 /* ---------- responsive ---------- */
 
 @media (max-width: 900px) {

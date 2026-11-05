@@ -3,3 +3,7 @@ node_modules/
 .DS_Store
 .env
 .env.*
+data/
+
+# Generated SEO catalog (built by website/build-catalog.mjs, deployed to opensmm.dev repo)
+website/catalog/
