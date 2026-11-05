@@ -252,11 +252,16 @@ export function createMcpServer(core: OpenSmmCore): McpServer {
   return server;
 }
 
-const isMain = process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, "/"));
-if (isMain) {
+/** Start the stdio server. Called by direct execution and by bin/opensmm.mjs. */
+export async function serveStdio(): Promise<void> {
   const { createStackFromEnv } = await import("../../../bootstrap.ts");
   const { core, provider } = await createStackFromEnv();
   const server = createMcpServer(core);
   await server.connect(new StdioServerTransport());
   console.error(`OpenSMM v0.1-draft MCP server running on stdio (provider: ${provider.providerId})`);
+}
+
+const isMain = process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, "/"));
+if (isMain) {
+  await serveStdio();
 }

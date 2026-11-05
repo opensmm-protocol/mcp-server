@@ -96,12 +96,14 @@ MCP (stdio, for Claude Desktop / Kimi Code / Cursor):
 {
   "mcpServers": {
     "opensmm": {
-      "command": "node",
-      "args": ["/path/to/mcp-server/src/adapters/inbound/mcp/server.ts"]
+      "command": "npx",
+      "args": ["-y", "@opensmm/mcp-server"]
     }
   }
 }
 ```
+
+or from a checkout: `"command": "node", "args": ["/path/to/mcp-server/bin/opensmm.mjs"]`.
 
 Tools: `get_capabilities`, `list_providers`, `register_provider`,
 `search_services`, `get_service`, `get_quote`, `create_order`,
