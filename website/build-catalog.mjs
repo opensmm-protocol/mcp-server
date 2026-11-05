@@ -16,9 +16,10 @@
  *   CATALOG_FILE=/tmp/catalog.json node website/build-catalog.mjs
  */
 
-import { mkdir, writeFile, readFile } from "node:fs/promises";
+import { mkdir, writeFile, readFile, rm } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { translateName, translateCategory } from "./catalog-i18n.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = join(HERE, "catalog");
@@ -226,7 +227,11 @@ async function loadServices() {
     const body = await res.json();
     services = body.services;
   }
-  return services.map((s) => ({ ...s, name: cleanName(s.name) }));
+  return services.map((s) => ({
+    ...s,
+    name: translateName(cleanName(s.name), s.platform),
+    ...(s.category ? { category: translateCategory(s.category, s.platform) } : {}),
+  }));
 }
 
 /* ---------- pages ---------- */
@@ -403,6 +408,9 @@ ${body}
 
 const services = await loadServices();
 console.log(`loaded ${services.length} services`);
+
+// wipe stale pages: services and groupings drift between builds
+await rm(OUT_DIR, { recursive: true, force: true });
 
 const byPlatform = new Map();
 for (const s of services) {
