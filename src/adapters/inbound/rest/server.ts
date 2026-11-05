@@ -12,6 +12,6 @@ const server = createServer((req, res) => {
 });
 
 server.listen(port, () => {
-  console.log(`OpenSMM v0.1-draft REST listening on http://localhost:${port}/v0 (provider: ${provider.providerId})`);
+  console.log(`OpenSMM 0.1.0 REST listening on http://localhost:${port}/v0 (provider: ${provider.providerId})`);
   console.log(`try: curl http://localhost:${port}/v0/capabilities`);
 });

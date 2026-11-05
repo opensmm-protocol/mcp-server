@@ -5,8 +5,8 @@
 > **Open, provider-neutral protocol for ordering and executing social media growth services by AI agents.**
 > MCP is one way to connect — not the product itself.
 
-**Status: `0.1.0-draft` — the spec and reference gateway are feature-complete
-for the v0 draft and covered by tests; not yet published to npm or MCP registries.**
+**Status: `0.1.0` — first public release. The spec and reference gateway are
+feature-complete for v0 and covered by tests.**
 
 **For AI agents:** start with [`llms.txt`](./llms.txt).
 **For supply nodes:** [`docs/PROVIDER_ONBOARDING.md`](./docs/PROVIDER_ONBOARDING.md) —
@@ -61,7 +61,7 @@ Requires Node.js ≥ 22.6 (runs TypeScript natively).
 
 ```bash
 npm install
-npm test          # 86 tests: core, transports, adapters, payments, registry, spec examples
+npm test          # tests: core, transports, adapters, payments, registry, spec examples
 ```
 
 REST:
@@ -70,6 +70,13 @@ REST:
 npm run rest      # http://localhost:3100/v0
 curl http://localhost:3100/v0/capabilities
 curl "http://localhost:3100/v0/services?query=members&platform=telegram"
+```
+
+MCP over stdio (local agents) and Streamable HTTP (hosted gateway, e.g. `https://mcp.opensmm.dev/mcp`):
+
+```bash
+npm run mcp         # stdio — point your MCP client at this process
+npm run mcp:http    # http://localhost:3200/mcp — stateless Streamable HTTP, open CORS
 ```
 
 ## Connecting a live provider (rest-v1)

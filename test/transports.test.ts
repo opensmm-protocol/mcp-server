@@ -52,7 +52,7 @@ describe("REST and MCP are one protocol", () => {
     const viaMcp = await mcpCall("get_capabilities", {});
     assert.equal(viaRest.status, 200);
     assert.deepEqual(viaMcp, viaRest.body);
-    assert.equal(viaRest.body.protocolVersion, "0.1.0-draft");
+    assert.equal(viaRest.body.protocolVersion, "0.1.0");
   });
 
   it("the acceptance flow works end-to-end over pure REST", async () => {
@@ -181,5 +181,17 @@ describe("REST and MCP are one protocol", () => {
     });
     assert.equal(badQuote.status, 400);
     assert.equal(badQuote.body.error.code, "VALIDATION_FAILED");
+  });
+
+  it("REST answers CORS preflight and marks JSON responses cross-origin readable", async () => {
+    const res = await fetch(`${baseUrl}/v0/services`, {
+      method: "OPTIONS",
+      headers: { origin: "https://opensmm.dev" },
+    });
+    assert.equal(res.status, 204);
+    assert.equal(res.headers.get("access-control-allow-origin"), "*");
+
+    const get = await fetch(`${baseUrl}/v0/capabilities`);
+    assert.equal(get.headers.get("access-control-allow-origin"), "*");
   });
 });

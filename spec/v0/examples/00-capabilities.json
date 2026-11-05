@@ -1,5 +1,5 @@
 {
-  "protocolVersion": "0.1.0-draft",
+  "protocolVersion": "0.1.0",
   "commands": [
     "getCapabilities",
     "searchServices",

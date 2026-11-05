@@ -58,6 +58,7 @@ export function createDevStack(): DevStack {
     registry: core.registry,
     catalog: core.catalog,
     pollActiveOrders: () => core.refreshActiveOrders(),
+    runRetentionChecks: () => core.runRetentionChecks(),
   });
   return { core, provider, supervisor };
 }
@@ -83,6 +84,9 @@ export async function createStackFromEnv(
     catalog,
     providers: [provider],
     paymentMethods: ["mock"],
+    ...(process.env.OPENSMM_RETENTION_CHECK_MS
+      ? { retentionCheckMs: Number(process.env.OPENSMM_RETENTION_CHECK_MS) }
+      : {}),
     providerInfo: {
       [providerId]: {
         ...(listedName ? { displayName: listedName, publiclyListed: true } : {}),
@@ -96,6 +100,7 @@ export async function createStackFromEnv(
     registry: core.registry,
     catalog: core.catalog,
     pollActiveOrders: () => core.refreshActiveOrders(),
+    runRetentionChecks: () => core.runRetentionChecks(),
     ...(process.env.OPENSMM_SYNC_INTERVAL_MS
       ? { syncIntervalMs: Number(process.env.OPENSMM_SYNC_INTERVAL_MS) }
       : {}),

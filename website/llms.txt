@@ -1,0 +1,58 @@
+# OpenSMM Protocol
+
+> Open, provider-neutral protocol for ordering and executing social media
+> growth services by AI agents. MCP is one transport; REST /v0 is the
+> canonical HTTP binding. Gateways route and measure — with direct settlement
+> (x402, USDC on Base) money flows agent → provider and never transits the
+> gateway.
+
+Site: https://opensmm.dev
+Source: https://github.com/opensmm-protocol/mcp-server (MIT)
+
+## Key facts for agents
+
+- Protocol version: 0.1.0, URL prefix /v0.
+- One rule: the same operation via REST and MCP yields the same domain
+  objects. Same clientReference → same orderId on any transport.
+- Money is decimal strings on integer micro-units. Never floats.
+- Idempotency is protocol-level: Idempotency-Key header (REST) /
+  clientReference (MCP). Replay returns the same order.
+- paymentStatus and executionStatus are separate state machines.
+- Canonical error codes: VALIDATION_FAILED, NOT_FOUND, SERVICE_UNAVAILABLE,
+  QUOTE_EXPIRED, QUOTE_MISMATCH, PAYMENT_REQUIRED, SETTLEMENT_PENDING,
+  SUBMISSION_UNKNOWN, PROVIDER_REJECTED, POLICY_DENIED, IDEMPOTENCY_CONFLICT,
+  REFUND_REQUIRED, INTERNAL.
+
+## Acceptance flow
+
+search → quote → create order (HTTP 402 + payment requirements) → settle
+(x402 proof, USDC on Base) → execution → poll status → completion. A quote
+is mandatory before ordering and is consumed exactly once.
+
+## Commands (REST / MCP tool)
+
+- getCapabilities — GET /v0/capabilities / get_capabilities
+- listProviders — GET /v0/providers / list_providers
+- registerProvider — POST /v0/providers / register_provider
+- searchServices — GET /v0/services / search_services
+- getService — GET /v0/services/{id} / get_service
+- getQuote — POST /v0/quotes / get_quote
+- createOrder — POST /v0/orders / create_order
+- getOrder — GET /v0/orders/{id} / get_order_status
+- cancelOrder — POST /v0/orders/{id}/cancel / cancel_order
+- requestRefill — POST /v0/orders/{id}/refill / request_refill
+
+## Choosing a provider
+
+GET /v0/providers lists pseudonymous nodes (providerKey, lifecycle,
+capabilities, offersCount, gateway-measured metrics). Metrics are measured
+by the gateway from real orders, never self-reported. Quality tiers are
+derived with the open formula in spec §9.1 — recompute them yourself.
+
+## Docs
+
+- Protocol spec: https://github.com/opensmm-protocol/mcp-server/tree/main/spec/v0
+- JSON Schemas: https://github.com/opensmm-protocol/mcp-server/tree/main/spec/v0/schemas
+- Runnable examples: https://github.com/opensmm-protocol/mcp-server/tree/main/spec/v0/examples
+- Provider onboarding (incl. a copy-paste AI prompt): https://github.com/opensmm-protocol/mcp-server/blob/main/docs/PROVIDER_ONBOARDING.md
+- MCP server manifest: https://opensmm.dev/mcp.json

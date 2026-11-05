@@ -41,6 +41,8 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
   res.writeHead(status, {
     "content-type": "application/json; charset=utf-8",
     "content-length": Buffer.byteLength(payload),
+    // Open read API: browser agents and the opensmm.dev site fetch cross-origin.
+    "access-control-allow-origin": "*",
   });
   res.end(payload);
 }
@@ -77,6 +79,16 @@ export function createRestHandler(
       const url = new URL(req.url ?? "/", "http://localhost");
       const path = url.pathname.replace(/\/+$/, "") || "/";
       const method = req.method ?? "GET";
+
+      if (method === "OPTIONS") {
+        res.writeHead(204, {
+          "access-control-allow-origin": "*",
+          "access-control-allow-methods": "GET, POST, OPTIONS",
+          "access-control-allow-headers": "content-type, idempotency-key",
+        });
+        res.end();
+        return;
+      }
 
       if (method === "GET" && path === "/v0/capabilities") {
         sendJson(res, 200, core.getCapabilities());

@@ -73,6 +73,17 @@ export class MockProvider implements OpenSmmProvider {
     exec.behavior = { kind: "stall" };
   }
 
+  /**
+   * Test/dev hook: completed executions report only (1 - fraction) of the
+   * ordered quantity as delivered — simulates post-completion drops for
+   * retention re-checks.
+   */
+  setDeliveredDrop(fraction: number): void {
+    this.dropFraction = fraction;
+  }
+
+  private dropFraction = 0;
+
   getExecutionCount(): number {
     return this.executions.size;
   }
@@ -148,7 +159,7 @@ export class MockProvider implements OpenSmmProvider {
       rawStatus: "Completed",
       startCount: 0,
       remains: 0,
-      delivered: exec.input.quantity,
+      delivered: Math.floor(exec.input.quantity * (1 - this.dropFraction)),
     };
   }
 

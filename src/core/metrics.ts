@@ -26,6 +26,8 @@ interface ProviderCounters {
   deliveredUnits: number;
   startLatenciesSec: number[];
   completionLatenciesSec: number[];
+  /** Delivered-now / delivered-at-completion ratios from delayed re-checks. */
+  retentionRatios: number[];
 }
 
 /** Latency samples are bounded; old samples drop out of the window. */
@@ -40,6 +42,7 @@ function emptyCounters(): ProviderCounters {
     deliveredUnits: 0,
     startLatenciesSec: [],
     completionLatenciesSec: [],
+    retentionRatios: [],
   };
 }
 
@@ -82,6 +85,15 @@ export class MetricsRecorder {
   }
 
   /**
+   * Delayed re-check of a completed execution: how much of the delivered
+   * volume survived. Feeds retentionD7 (spec/v0 §9.1).
+   */
+  recordRetention(providerId: string, ratio: number): void {
+    const clamped = Math.min(1, Math.max(0, ratio));
+    pushBounded(this.for(providerId).retentionRatios, clamped);
+  }
+
+  /**
    * Public snapshot for listProviders (spec/v0 §9). Sparse by design:
    * ratio/latency fields appear only when the sample supports them.
    */
@@ -101,6 +113,10 @@ export class MetricsRecorder {
     if (startP50 !== undefined) metrics.measuredStartP50Sec = startP50;
     const completionP50 = p50(c.completionLatenciesSec);
     if (completionP50 !== undefined) metrics.measuredCompletionP50Sec = completionP50;
+    if (c.retentionRatios.length > 0) {
+      metrics.retentionD7 =
+        c.retentionRatios.reduce((sum, r) => sum + r, 0) / c.retentionRatios.length;
+    }
     return metrics;
   }
 

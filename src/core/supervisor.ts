@@ -32,10 +32,14 @@ export interface SupervisorOptions {
   catalog: Catalog;
   /** Background order polling; typically `core.refreshActiveOrders()`. */
   pollActiveOrders?: () => Promise<number>;
+  /** Retention re-checks; typically `core.runRetentionChecks()`. */
+  runRetentionChecks?: () => Promise<number>;
   /** Catalog sync interval when started. Default 5 minutes. */
   syncIntervalMs?: number;
   /** Order poll interval when started. Default 30 seconds. */
   pollIntervalMs?: number;
+  /** Retention re-check interval when started. Default 1 hour. */
+  retentionIntervalMs?: number;
   /** Consecutive sync failures that suspend a node. Default 3. */
   failureThreshold?: number;
 }
@@ -44,8 +48,10 @@ export class NodeSupervisor {
   private readonly registry: ProviderRegistry;
   private readonly catalog: Catalog;
   private readonly pollActive?: () => Promise<number>;
+  private readonly retentionChecks?: () => Promise<number>;
   private readonly syncIntervalMs: number;
   private readonly pollIntervalMs: number;
+  private readonly retentionIntervalMs: number;
   private readonly failureThreshold: number;
   private readonly failures = new Map<string, number>();
   private timers: ReturnType<typeof setInterval>[] = [];
@@ -54,8 +60,10 @@ export class NodeSupervisor {
     this.registry = options.registry;
     this.catalog = options.catalog;
     if (options.pollActiveOrders) this.pollActive = options.pollActiveOrders;
+    if (options.runRetentionChecks) this.retentionChecks = options.runRetentionChecks;
     this.syncIntervalMs = options.syncIntervalMs ?? 5 * 60 * 1000;
     this.pollIntervalMs = options.pollIntervalMs ?? 30 * 1000;
+    this.retentionIntervalMs = options.retentionIntervalMs ?? 60 * 60 * 1000;
     this.failureThreshold = options.failureThreshold ?? 3;
   }
 
@@ -105,6 +113,11 @@ export class NodeSupervisor {
     return this.pollActive ? this.pollActive() : 0;
   }
 
+  /** Run due retention re-checks (spec/v0 §9.1); returns checks performed. */
+  async tickRetention(): Promise<number> {
+    return this.retentionChecks ? this.retentionChecks() : 0;
+  }
+
   /** Current consecutive sync failure count (inspection / tests). */
   consecutiveFailures(providerId: string): number {
     return this.failures.get(providerId) ?? 0;
@@ -120,6 +133,11 @@ export class NodeSupervisor {
       const poll = setInterval(() => void this.tickPoll(), this.pollIntervalMs);
       poll.unref();
       this.timers.push(poll);
+    }
+    if (this.retentionChecks) {
+      const retention = setInterval(() => void this.tickRetention(), this.retentionIntervalMs);
+      retention.unref();
+      this.timers.push(retention);
     }
   }
 

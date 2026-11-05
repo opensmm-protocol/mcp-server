@@ -40,7 +40,7 @@ import type {
   Service,
 } from "./types.ts";
 
-const PROTOCOL_VERSION = "0.1.0-draft" as const;
+const PROTOCOL_VERSION = "0.1.0" as const;
 const ALL_COMMANDS: CommandName[] = [
   "getCapabilities",
   "searchServices",
@@ -87,6 +87,11 @@ interface ExecutionRecord {
   completedAt?: number;
   /** High-water mark of delivered units seen across polls. */
   maxDelivered: number;
+  /** Delivered at terminal observation — the baseline for the retention check. */
+  deliveredAtCompletion?: number;
+  /** When the delayed retention re-check is due (epoch ms). */
+  retentionDueAt?: number;
+  retentionDone?: boolean;
   latestSnapshot?: ExecutionSnapshot;
 }
 
@@ -111,6 +116,11 @@ export interface CoreOptions {
   ssrf?: SsrfGuardOptions;
   /** Gateway-measured provider metrics (spec/v0 §9). A shared default is created when omitted. */
   metrics?: MetricsRecorder;
+  /**
+   * Delay between a terminal observation and the retention re-check
+   * (spec/v0 §9.1 retentionD7). Default 7 days.
+   */
+  retentionCheckMs?: number;
   /**
    * Verification policy for self-registered nodes (spec/v0 §10.1).
    * UNVERIFIED nodes are routable but volume-capped per order; promotion and
@@ -145,6 +155,7 @@ export class OpenSmmCore {
   private readonly ssrf: SsrfGuardOptions;
   private readonly quoteTtlMs: number;
   readonly metrics: MetricsRecorder;
+  private readonly retentionCheckMs: number;
   private readonly verification: Required<NonNullable<CoreOptions["verification"]>>;
 
   private readonly quotes = new Map<string, QuoteRecord>();
@@ -179,6 +190,7 @@ export class OpenSmmCore {
     if (options.providerFactory) this.providerFactory = options.providerFactory;
     this.ssrf = options.ssrf ?? {};
     this.metrics = options.metrics ?? new MetricsRecorder();
+    this.retentionCheckMs = options.retentionCheckMs ?? 7 * 24 * 60 * 60 * 1000;
     const v = options.verification ?? {};
     this.verification = {
       maxUnverifiedOrderValue: v.maxUnverifiedOrderValue ?? 50,
@@ -779,6 +791,43 @@ export class OpenSmmCore {
     }
   }
 
+  /**
+   * Run due retention re-checks: re-poll completed executions and record how
+   * much of the delivered volume survived (retentionD7, spec/v0 §9.1).
+   * Returns the number of checks performed. Safe to call on an interval.
+   */
+  async runRetentionChecks(): Promise<number> {
+    const now = Date.now();
+    let checked = 0;
+    for (const [orderId, exec] of this.executions) {
+      if (
+        exec.retentionDone ||
+        exec.retentionDueAt === undefined ||
+        exec.retentionDueAt > now ||
+        exec.deliveredAtCompletion === undefined
+      ) {
+        continue;
+      }
+      exec.retentionDone = true; // never retry: a failed re-check is skipped, not fatal
+      try {
+        const order = this.orders.get(orderId);
+        if (!order) continue;
+        const entry = this.requireEntry(order.serviceId);
+        const snapshot = await this.providerFor(entry.providerId).getExecution(exec.externalExecutionId);
+        if (snapshot.delivered !== undefined && exec.deliveredAtCompletion > 0) {
+          this.metrics.recordRetention(
+            entry.providerId,
+            snapshot.delivered / exec.deliveredAtCompletion,
+          );
+          checked += 1;
+        }
+      } catch {
+        // Provider unreachable at re-check time: no data, no penalty.
+      }
+    }
+    return checked;
+  }
+
   /** Poll every in-flight execution; returns the number of orders refreshed. */
   async refreshActiveOrders(): Promise<number> {
     let refreshed = 0;
@@ -826,6 +875,12 @@ export class OpenSmmCore {
           deliveredUnits: delivered,
           completionLatencySec: (now - exec.submittedAt) / 1000,
         });
+        // Schedule the delayed retention re-check for delivered orders
+        // (spec/v0 §9.1 retentionD7): drops after completion downgrade the node.
+        if (snapshot.status === "COMPLETED" && delivered > 0) {
+          exec.deliveredAtCompletion = delivered;
+          exec.retentionDueAt = now + this.retentionCheckMs;
+        }
         this.evaluateNode(entry.providerId);
       }
     } catch {

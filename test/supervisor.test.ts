@@ -53,10 +53,15 @@ class FlakyProvider implements OpenSmmProvider {
   }
 }
 
-function coreWithMock() {
+function coreWithMock(retentionCheckMs?: number) {
   const provider = new MockProvider();
   const catalog = new InMemoryCatalog(mockCatalogEntries);
-  const core = new OpenSmmCore({ catalog, providers: [provider], paymentMethods: ["mock"] });
+  const core = new OpenSmmCore({
+    catalog,
+    providers: [provider],
+    paymentMethods: ["mock"],
+    ...(retentionCheckMs !== undefined ? { retentionCheckMs } : {}),
+  });
   const supervisor = new NodeSupervisor({
     registry: core.registry,
     catalog: core.catalog,
@@ -200,6 +205,28 @@ describe("node supervision (spec §10.4)", () => {
     for (let i = 0; i < 5; i++) refreshed = await supervisor.tickPoll();
     assert.equal(order.executionStatus, "COMPLETED");
     assert.equal(refreshed, 0); // terminal orders are no longer polled
+  });
+
+  it("retentionD7 is measured by delayed re-checks after completion (spec §9.1)", async () => {
+    const { core, provider } = coreWithMock(0); // retention due immediately
+    const order = await createPaidOrder(core, "ret-1");
+    for (let i = 0; i < 5; i++) await core.refreshActiveOrders();
+    assert.equal(order.executionStatus, "COMPLETED");
+
+    // No retention data yet.
+    let { providers } = await core.listProviders();
+    assert.equal(providers[0]!.metrics.retentionD7, undefined);
+
+    // Half the delivered volume dropped after completion.
+    provider.setDeliveredDrop(0.5);
+    const checked = await core.runRetentionChecks();
+    assert.equal(checked, 1);
+
+    ({ providers } = await core.listProviders());
+    assert.equal(providers[0]!.metrics.retentionD7, 0.5);
+
+    // Each order is re-checked exactly once.
+    assert.equal(await core.runRetentionChecks(), 0);
   });
 });
 

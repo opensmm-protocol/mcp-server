@@ -1,8 +1,8 @@
-# OpenSMM Protocol v0.1 (draft)
+# OpenSMM Protocol v0.1
 
-**Status:** `0.1.0-draft` — experimental. Breaking changes are allowed without notice
-until `/v1`. All endpoints live under `/v0`. MCP tool names are stable within a minor
-protocol version.
+**Status:** `0.1.0` — public release. Breaking changes are still allowed without
+notice until `/v1`. All endpoints live under `/v0`. MCP tool names are stable
+within a minor protocol version.
 
 OpenSMM is a domain protocol for ordering and executing social-growth services by AI
 agents. MCP is one inbound adapter; REST is the canonical HTTP binding. The same
@@ -310,7 +310,7 @@ This endpoint and method MUST NOT be enabled in production configuration.
 
 ## 12. Versioning
 
-- Protocol: `0.1.0-draft`, URL prefix `/v0`.
+- Protocol: `0.1.0`, URL prefix `/v0`.
 - `catalogVersion` changes whenever the catalog content changes; quotes pin it.
 - Supported protocol versions are announced via `getCapabilities`.
 - Deprecations require a deprecation window after `/v1` exists.

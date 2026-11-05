@@ -1,5 +1,5 @@
 /**
- * OpenSMM Protocol v0.1-draft canonical model.
+ * OpenSMM Protocol v0.1 canonical model.
  * Mirrors spec/v0/schemas/*. Transport-agnostic: no MCP/REST/A2A imports allowed here.
  */
 
@@ -194,7 +194,7 @@ export interface ProviderInfo {
 }
 
 export interface Capabilities {
-  protocolVersion: "0.1.0-draft";
+  protocolVersion: "0.1.0";
   commands: CommandName[];
   paymentMethods: PaymentMethod[];
   features: { cancel: boolean; refill: boolean };

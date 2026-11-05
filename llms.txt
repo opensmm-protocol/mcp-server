@@ -8,7 +8,7 @@
 
 ## Key facts for agents
 
-- Protocol version: 0.1.0-draft, URL prefix /v0.
+- Protocol version: 0.1.0, URL prefix /v0.
 - One rule: the same operation via REST and MCP yields the same domain
   objects. Same clientReference → same orderId on any transport.
 - Money is decimal strings on integer micro-units. Never floats.
