@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OpenSMM — the open order protocol between AI agents and social growth</title>
+<meta name="description" content="OpenSMM is an open, provider-neutral protocol for ordering social media growth services from AI agents. Catalog, quotes, direct USDC settlement on Base, measured provider quality. MCP tools or plain HTTP.">
+<meta property="og:title" content="OpenSMM — the open order protocol between AI agents and social growth">
+<meta property="og:description" content="Provider-neutral order protocol: search, quote, direct USDC settlement on Base, measured provider quality. MCP tools or plain HTTP.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230052FF'/%3E%3Crect x='7' y='17' width='4' height='8' rx='1' fill='%23fff'/%3E%3Crect x='14' y='12' width='4' height='13' rx='1' fill='%23fff'/%3E%3Crect x='21' y='7' width='4' height='18' rx='1' fill='%23fff'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap nav-row">
+    <a class="brand" href="/">OpenSMM <span class="version">v0.1-draft</span></a>
+    <nav class="nav-links">
+      <a href="#how">How it works</a>
+      <a href="#tools">Tools</a>
+      <a href="#settlement">Settlement</a>
+      <a href="#trust">Trust</a>
+      <a href="#supply">Run a node</a>
+      <a href="https://github.com/opensmm-protocol/mcp-server">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div class="hero-copy">
+      <h1>The open wire between AI&nbsp;agents and social&nbsp;growth.</h1>
+      <p class="lede">
+        OpenSMM is a provider-neutral order protocol. An agent searches a catalog,
+        locks a quote, pays the provider directly in USDC on Base, and tracks
+        execution — through MCP tools or plain HTTP.
+      </p>
+      <div class="hero-actions">
+        <a class="btn" href="https://github.com/opensmm-protocol/mcp-server/tree/main/spec/v0">Read the spec</a>
+        <div class="cmd-chip">
+          <code id="quickstart">git clone https://github.com/opensmm-protocol/mcp-server && npm install && npm test</code>
+          <button class="copy" data-copy="quickstart" aria-label="Copy quick start command">Copy</button>
+        </div>
+      </div>
+      <p class="hero-note">MIT licensed. Ten MCP tools. One rule: the same call over REST and MCP returns the same order.</p>
+    </div>
+
+    <div class="wire" role="img" aria-label="A protocol session: search, quote, payment required, settlement, completion.">
+      <div class="wire-head">
+        <span class="wire-dot"></span><span class="wire-dot"></span><span class="wire-dot"></span>
+        <span class="wire-title">agent session — opensmm/v0</span>
+      </div>
+      <pre class="wire-body" id="wire-body"></pre>
+    </div>
+  </div>
+</section>
+
+<section id="how" class="section">
+  <div class="wrap">
+    <h2>How an order moves</h2>
+    <ol class="flow">
+      <li>
+        <span class="flow-step">1</span>
+        <h3>Search</h3>
+        <p><code>search_services</code> finds offers by platform and objective across every connected node, with per-1000 rates.</p>
+      </li>
+      <li>
+        <span class="flow-step">2</span>
+        <h3>Quote</h3>
+        <p><code>get_quote</code> locks service, quantity, price and expiry. Quotes are consumed exactly once.</p>
+      </li>
+      <li>
+        <span class="flow-step">3</span>
+        <h3>Order</h3>
+        <p><code>create_order</code> is idempotent on <code>clientReference</code> and answers <code>402</code> with payment requirements.</p>
+      </li>
+      <li>
+        <span class="flow-step">4</span>
+        <h3>Pay</h3>
+        <p>The agent sends USDC on Base to the provider's own address — x402 style. The gateway never holds funds.</p>
+      </li>
+      <li>
+        <span class="flow-step">5</span>
+        <h3>Track</h3>
+        <p><code>get_order_status</code> polls two independent statuses — payment and execution — to <code>COMPLETED</code>.</p>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<section id="tools" class="section">
+  <div class="wrap">
+    <h2>Ten tools, one contract</h2>
+    <p class="section-lede">MCP is one inbound adapter; REST under <code>/v0</code> is the canonical binding. Same call, same domain objects, any transport.</p>
+    <div class="tools-grid">
+      <div class="tool"><code>get_capabilities</code><p>Protocol version, commands, payment methods, catalog version.</p></div>
+      <div class="tool"><code>search_services</code><p>Search the catalog by text, platform and objective.</p></div>
+      <div class="tool"><code>get_service</code><p>Rate, rate basis, min/max, parameters, refill and cancel support.</p></div>
+      <div class="tool"><code>get_quote</code><p>A priced, expiring offer. Mandatory before ordering.</p></div>
+      <div class="tool"><code>create_order</code><p>Idempotent order creation; returns payment requirements.</p></div>
+      <div class="tool"><code>get_order_status</code><p>Payment and execution status, polled safely.</p></div>
+      <div class="tool"><code>cancel_order</code><p>Cancel where the service supports it.</p></div>
+      <div class="tool"><code>request_refill</code><p>Restore drops on completed or partial orders.</p></div>
+      <div class="tool"><code>list_providers</code><p>Pseudonymous nodes with gateway-measured quality metrics.</p></div>
+      <div class="tool"><code>register_provider</code><p>Permissionless supply-node onboarding. No emails, no forms.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="settlement" class="section">
+  <div class="wrap">
+    <h2>Money never transits the gateway</h2>
+    <p class="section-lede">
+      Direct settlement is the canonical topology. The payment requirement of an order
+      names the provider's own payout address; the agent pays it on Base in USDC.
+      OpenSMM routes, quotes and measures — it is software, not a counterparty.
+    </p>
+    <div class="settle-diagram" role="img" aria-label="The agent pays the provider directly in USDC on Base; the gateway routes and measures.">
+      <div class="money-row">
+        <div class="node">Agent</div>
+        <div class="money-line">
+          <span class="money-label">USDC on Base</span>
+          <span class="money-arrow"></span>
+        </div>
+        <div class="node">Provider</div>
+      </div>
+      <div class="gw-line">
+        <span class="gw-arrow"></span>
+        <div class="node gw">OpenSMM gateway<span class="gw-sub">routes, quotes, measures — never custodies</span></div>
+        <span class="gw-arrow"></span>
+      </div>
+    </div>
+    <p class="section-note">No balances, no custody, no merchant of record. A gateway that only routes has nothing to steal and nothing to freeze.</p>
+  </div>
+</section>
+
+<section id="trust" class="section">
+  <div class="wrap">
+    <h2>Reputation is measured, not claimed</h2>
+    <p class="section-lede">
+      Providers are pseudonymous (<code>provider-alpha</code>, <code>provider-beta</code>, …) and every
+      quality number is observed by the gateway from its own orders. Self-reported rates are forbidden;
+      a metric appears only when the sample justifies it.
+    </p>
+    <div class="formula">
+      <code>qualityScore = deliveredRatio<sup>1.5</sup> × retentionD7<sup>2</sup> × e<sup>−startP50 / 300</sup></code>
+    </div>
+    <table class="tiers">
+      <thead>
+        <tr><th>Tier</th><th>Requirements (all measured)</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="tier">S</td><td>sample ≥ 50, delivered ≥ 0.98, retention D7 ≥ 0.95, start p50 ≤ 60s</td></tr>
+        <tr><td class="tier">A</td><td>sample ≥ 20, delivered ≥ 0.95, retention D7 ≥ 0.85</td></tr>
+        <tr><td class="tier">B</td><td>sample ≥ 5, delivered ≥ 0.80</td></tr>
+        <tr><td class="tier">Unranked</td><td>insufficient data — the node is volume-capped until it proves itself</td></tr>
+      </tbody>
+    </table>
+    <p class="section-note">
+      Supervision is built in: catalogs re-sync on an interval, three consecutive sync failures
+      suspend a node, one success brings it back. New nodes start <code>UNVERIFIED</code> with a
+      per-order volume cap — an exit scam cannot take more than the cap allows.
+    </p>
+  </div>
+</section>
+
+<section id="supply" class="section">
+  <div class="wrap">
+    <h2>Run a supply node</h2>
+    <p class="section-lede">
+      If your API speaks the classic SMM panel dialect (<code>key</code> + <code>action</code>) or a
+      reseller REST shape, registration is one call. The gateway validates the endpoint,
+      healthchecks it by listing your offers, and syncs them into the catalog.
+    </p>
+    <div class="code-block">
+      <div class="code-head"><span>register_provider</span><button class="copy" data-copy="reg-json" aria-label="Copy registration example">Copy</button></div>
+<pre id="reg-json">{
+  "adapter": "smm-v2",
+  "endpoint": "https://your-panel.example/api/v2",
+  "apiKey": "pk_live_…",
+  "payoutAddress": "0x…",
+  "publiclyListed": false
+}</pre>
+    </div>
+    <p class="section-note">
+      Your key is never returned, logged or listed. Add a payout address and every order on your
+      services pays you directly. Or skip the JSON entirely:
+      <a href="https://github.com/opensmm-protocol/mcp-server/blob/main/docs/PROVIDER_ONBOARDING.md">paste a prompt into your AI assistant</a>
+      and let it do the call.
+    </p>
+  </div>
+</section>
+
+</main>
+
+<footer class="footer">
+  <div class="wrap footer-row">
+    <span>OpenSMM Protocol — MIT licensed open software</span>
+    <nav class="footer-links">
+      <a href="https://github.com/opensmm-protocol/mcp-server">GitHub</a>
+      <a href="https://github.com/opensmm-protocol/mcp-server/tree/main/spec/v0">Spec v0</a>
+      <a href="https://github.com/opensmm-protocol/mcp-server/blob/main/llms.txt">llms.txt</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>
