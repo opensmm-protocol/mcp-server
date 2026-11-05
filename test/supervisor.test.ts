@@ -202,3 +202,133 @@ describe("node supervision (spec §10.4)", () => {
     assert.equal(refreshed, 0); // terminal orders are no longer polled
   });
 });
+
+/** A provider that completes instantly and reports full delivery. */
+class DeliveringProvider implements OpenSmmProvider {
+  readonly providerId: string;
+  private readonly quantities = new Map<string, number>();
+  private seq = 0;
+
+  constructor(providerId: string) {
+    this.providerId = providerId;
+  }
+
+  async getCapabilities(): Promise<ProviderCapabilities> {
+    return { cancel: false, refill: false, batchStatus: false };
+  }
+
+  async listOffers(): Promise<ProviderOffer[]> {
+    return [
+      {
+        externalServiceId: "svc-big",
+        name: "Delivering Telegram Members",
+        rate: "1.00",
+        rateBasis: "PER_1000",
+        currency: "USD",
+        minQuantity: 10,
+        maxQuantity: 1_000_000,
+        refill: false,
+        cancel: false,
+        dripfeed: false,
+      },
+    ];
+  }
+
+  async createExecution(input: CanonicalExecutionInput): Promise<ExecutionReference> {
+    const id = `${this.providerId}-exec-${++this.seq}`;
+    this.quantities.set(id, input.quantity);
+    return { externalExecutionId: id };
+  }
+
+  async getExecution(externalExecutionId: string): Promise<ExecutionSnapshot> {
+    return {
+      status: "COMPLETED",
+      rawStatus: "Completed",
+      remains: 0,
+      delivered: this.quantities.get(externalExecutionId) ?? 0,
+    };
+  }
+}
+
+const PUBLIC_DNS = async () => [{ address: "93.184.216.34", family: 4 }];
+
+describe("verification tier (spec §10.1)", () => {
+  async function registerDelivering(core: OpenSmmCore): Promise<string> {
+    const result = await core.registerProvider({
+      adapter: "rest-v1",
+      endpoint: "https://delivering.example/api/v1",
+      apiKey: "secret",
+    });
+    const { providers } = await core.listProviders();
+    return providers.find((p) => p.providerKey === result.providerKey)!.providerKey;
+  }
+
+  function coreWithFactory() {
+    let lastProvider: DeliveringProvider | undefined;
+    const core = new OpenSmmCore({
+      catalog: new InMemoryCatalog(mockCatalogEntries),
+      providers: [new MockProvider()],
+      paymentMethods: ["mock"],
+      ssrf: { lookup: PUBLIC_DNS },
+      providerFactory: async (_input, providerId) => {
+        const provider = new DeliveringProvider(providerId);
+        lastProvider = provider;
+        return { provider, offers: await provider.listOffers() };
+      },
+    });
+    return { core, getProvider: () => lastProvider };
+  }
+
+  it("UNVERIFIED nodes are volume-capped; the cap lifts on promotion", async () => {
+    const { core } = coreWithFactory();
+    await registerDelivering(core);
+    const service = core.searchServices({ query: "delivering" }).services[0]!;
+    const nodeId = core.catalog.get(service.serviceId)!.providerId;
+    assert.equal(core.registry.get(nodeId)!.lifecycle, "UNVERIFIED");
+
+    // 100_000 units × $1.00/1k = $100 — over the default $50 cap.
+    assert.throws(
+      () => core.getQuote({ serviceId: service.serviceId, quantity: 100_000, link: "https://t.me/x" }),
+      (err: unknown) => {
+        assert.ok(err instanceof OpenSmmError);
+        assert.equal(err.code, "POLICY_DENIED");
+        return true;
+      },
+    );
+
+    // Within the cap the node is routable; five good orders promote it.
+    for (let i = 0; i < 5; i++) {
+      const quote = core.getQuote({ serviceId: service.serviceId, quantity: 1000, link: "https://t.me/x" });
+      assert.ok(quote.warnings.some((w) => w.includes("UNVERIFIED")));
+      const { order } = await core.createOrder({
+        quoteId: quote.quoteId,
+        link: "https://t.me/x",
+        clientReference: `verify-${i}`,
+      });
+      await core.settlePayment(order.paymentIntentId!);
+      await core.getOrder(order.orderId);
+      assert.equal(order.executionStatus, "COMPLETED");
+    }
+    assert.equal(core.registry.get(nodeId)!.lifecycle, "ACTIVE");
+
+    // Cap lifted: the $100 quote now succeeds.
+    const big = core.getQuote({ serviceId: service.serviceId, quantity: 100_000, link: "https://t.me/x" });
+    assert.equal(big.amount.value, "100.000000");
+  });
+
+  it("an ACTIVE node with measured errorRate > 0.5 is demoted to SUSPENDED", async () => {
+    const { core, provider } = coreWithMock();
+    for (let i = 0; i < 10; i++) {
+      provider.failNextSubmission("bad link");
+      const order = await createPaidOrder(core, `fail-${i}`);
+      assert.equal(order.executionStatus, "ERROR");
+    }
+    const metrics = core.metrics.snapshot("mock");
+    assert.equal(metrics.sampleSize, 10);
+    assert.equal(metrics.errorRate, 1);
+    assert.equal(core.registry.get("mock")!.lifecycle, "SUSPENDED");
+
+    // Demoted: out of search and quotes.
+    assert.equal(core.searchServices({}).services.length, 0);
+  });
+});

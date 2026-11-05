@@ -230,8 +230,9 @@ Flow:
    Failure → `PROVIDER_REJECTED`, nothing is registered.
 3. **Catalog sync.** The offers are normalized into gateway catalog entries
    (`serviceId` = `osmm_svc_<nodeId>_<externalId>`); `catalogVersion` changes.
-4. **Node goes `ACTIVE`** with `metrics.sampleSize: 0`. Reputation accrues
-   only from gateway-measured orders (§9).
+4. **Node goes `UNVERIFIED`** with `metrics.sampleSize: 0`. Reputation accrues
+   only from gateway-measured orders (§9); until promotion the node is
+   volume-capped (§10.1).
 
 Registration is **idempotent per endpoint**: re-registering the same
 `endpoint` returns the existing `providerKey` instead of duplicating the node.
@@ -242,9 +243,19 @@ Registration is **idempotent per endpoint**: re-registering the same
 UNVERIFIED → ACTIVE → SUSPENDED
 ```
 
-- `UNVERIFIED`: registered, healthcheck pending or sandbox evaluation running.
-  Gateways MAY cap order volume for such nodes (anti exit-scam throttle).
-- `ACTIVE`: routable.
+- `UNVERIFIED`: registered and healthchecked, but without gateway-measured
+  history. Routable and searchable, with an **anti exit-scam volume cap**:
+  `getQuote` fails with `POLICY_DENIED` when the nominal order amount exceeds
+  the cap (this implementation: 50 units of the quote currency per order).
+  Promotion is computed, not negotiated:
+
+  ```
+  UNVERIFIED → ACTIVE when  sampleSize ≥ 5  AND  deliveredRatio ≥ 0.80  AND  errorRate ≤ 0.20
+  ACTIVE → SUSPENDED when   sampleSize ≥ 10 AND  errorRate > 0.50
+  ```
+
+  Both transitions run automatically after every measured order outcome.
+- `ACTIVE`: routable without the volume cap.
 - `SUSPENDED`: excluded from routing and search; reactivation is a gateway
   policy decision. In-flight orders of a suspended node keep polling to
   completion — suspension stops *new* business, not existing obligations.

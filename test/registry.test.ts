@@ -214,7 +214,7 @@ describe("registerProvider", () => {
       endpoint: "https://node-a.example/api/v1",
       apiKey: "secret",
     });
-    assert.equal(first.lifecycle, "ACTIVE");
+    assert.equal(first.lifecycle, "UNVERIFIED");
     assert.equal(first.offersCount, 1);
     assert.match(first.providerKey, /^provider-/);
 

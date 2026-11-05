@@ -111,6 +111,23 @@ export interface CoreOptions {
   ssrf?: SsrfGuardOptions;
   /** Gateway-measured provider metrics (spec/v0 §9). A shared default is created when omitted. */
   metrics?: MetricsRecorder;
+  /**
+   * Verification policy for self-registered nodes (spec/v0 §10.1).
+   * UNVERIFIED nodes are routable but volume-capped per order; promotion and
+   * demotion are computed from gateway-measured metrics, never self-reports.
+   */
+  verification?: {
+    /** Max nominal order amount for UNVERIFIED nodes. Default 50. */
+    maxUnverifiedOrderValue?: number;
+    /** Min measured sample for promotion UNVERIFIED → ACTIVE. Default 5. */
+    promoteSampleSize?: number;
+    /** Min deliveredRatio for promotion. Default 0.8. */
+    promoteDeliveredRatio?: number;
+    /** Min sample before quality demotion applies. Default 10. */
+    demoteSampleSize?: number;
+    /** errorRate above this demotes ACTIVE → SUSPENDED. Default 0.5. */
+    demoteErrorRate?: number;
+  };
   quoteTtlMs?: number;
 }
 
@@ -128,6 +145,7 @@ export class OpenSmmCore {
   private readonly ssrf: SsrfGuardOptions;
   private readonly quoteTtlMs: number;
   readonly metrics: MetricsRecorder;
+  private readonly verification: Required<NonNullable<CoreOptions["verification"]>>;
 
   private readonly quotes = new Map<string, QuoteRecord>();
   private readonly orders = new Map<string, Order>();
@@ -161,6 +179,14 @@ export class OpenSmmCore {
     if (options.providerFactory) this.providerFactory = options.providerFactory;
     this.ssrf = options.ssrf ?? {};
     this.metrics = options.metrics ?? new MetricsRecorder();
+    const v = options.verification ?? {};
+    this.verification = {
+      maxUnverifiedOrderValue: v.maxUnverifiedOrderValue ?? 50,
+      promoteSampleSize: v.promoteSampleSize ?? 5,
+      promoteDeliveredRatio: v.promoteDeliveredRatio ?? 0.8,
+      demoteSampleSize: v.demoteSampleSize ?? 10,
+      demoteErrorRate: v.demoteErrorRate ?? 0.5,
+    };
     this.quoteTtlMs = options.quoteTtlMs ?? 15 * 60 * 1000;
   }
 
@@ -252,7 +278,9 @@ export class OpenSmmCore {
     const node = this.registry.register({
       providerId,
       provider: built.provider,
-      lifecycle: "ACTIVE",
+      // Self-registered nodes start UNVERIFIED (spec/v0 §10.1): routable but
+      // volume-capped until gateway-measured metrics earn ACTIVE.
+      lifecycle: "UNVERIFIED",
       endpoint: input.endpoint,
       ...(input.displayName !== undefined ? { displayName: input.displayName } : {}),
       publiclyListed: input.publiclyListed ?? false,
@@ -330,12 +358,28 @@ export class OpenSmmCore {
       warnings.push("quote issued without link; createOrder must supply the final link");
     }
 
+    const amount = quoteAmount(service.rate, service.rateBasis, input.quantity);
+    // Anti exit-scam throttle (spec/v0 §10.1): UNVERIFIED nodes are
+    // volume-capped per order until measured quality earns ACTIVE.
+    const node = this.registry.get(entry.providerId);
+    if (node?.lifecycle === "UNVERIFIED") {
+      const nominal = Number(amount.value);
+      if (nominal > this.verification.maxUnverifiedOrderValue) {
+        throw new OpenSmmError(
+          "POLICY_DENIED",
+          `node is UNVERIFIED: order amount ${amount.value} ${amount.currency} exceeds the per-order cap of ${this.verification.maxUnverifiedOrderValue}`,
+          { serviceId: service.serviceId, cap: this.verification.maxUnverifiedOrderValue },
+        );
+      }
+      warnings.push("provider node is UNVERIFIED; per-order volume cap applies");
+    }
+
     const quote: Quote = {
       quoteId: newId("osmm_quote"),
       serviceId: service.serviceId,
       quantity: input.quantity,
       ...(input.link ? { link: input.link } : {}),
-      amount: quoteAmount(service.rate, service.rateBasis, input.quantity),
+      amount,
       catalogVersion: this.catalog.version,
       createdAt: created.toISOString(),
       expiresAt: new Date(created.getTime() + this.quoteTtlMs).toISOString(),
@@ -693,6 +737,7 @@ export class OpenSmmCore {
       if (err instanceof ProviderRejectedError) {
         // Definitive refusal: execution ERROR, payment heads to refund.
         this.metrics.recordRejection(entry.providerId, order.quantity);
+        this.evaluateNode(entry.providerId);
         this.setExecutionStatus(order, "ERROR");
         this.setPaymentStatus(order, "REFUNDING");
         return;
@@ -705,6 +750,32 @@ export class OpenSmmCore {
       // Network/timeout/etc: outcome unknowable — treat as ambiguous.
       this.setExecutionStatus(order, "SUBMISSION_UNKNOWN");
       return;
+    }
+  }
+
+  /**
+   * Lifecycle transitions computed from gateway-measured metrics (spec/v0
+   * §10.1): promotion UNVERIFIED → ACTIVE on proven quality, demotion
+   * ACTIVE → SUSPENDED on measured failure. Runs after every recorded outcome.
+   */
+  private evaluateNode(providerId: string): void {
+    const node = this.registry.get(providerId);
+    if (!node) return;
+    const m = this.metrics.snapshot(providerId);
+    if (node.lifecycle === "UNVERIFIED") {
+      if (
+        m.sampleSize >= this.verification.promoteSampleSize &&
+        (m.deliveredRatio ?? 0) >= this.verification.promoteDeliveredRatio &&
+        (m.errorRate ?? 1) <= 1 - this.verification.promoteDeliveredRatio
+      ) {
+        this.registry.setLifecycle(providerId, "ACTIVE");
+      }
+      return;
+    }
+    if (node.lifecycle === "ACTIVE") {
+      if (m.sampleSize >= this.verification.demoteSampleSize && (m.errorRate ?? 0) > this.verification.demoteErrorRate) {
+        this.registry.setLifecycle(providerId, "SUSPENDED");
+      }
     }
   }
 
@@ -755,6 +826,7 @@ export class OpenSmmCore {
           deliveredUnits: delivered,
           completionLatencySec: (now - exec.submittedAt) / 1000,
         });
+        this.evaluateNode(entry.providerId);
       }
     } catch {
       // Polling failure never moves the order backwards; keep last known status.
