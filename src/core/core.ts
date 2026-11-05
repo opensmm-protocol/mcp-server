@@ -8,7 +8,7 @@ import type { Catalog, CatalogEntry } from "./catalog.ts";
 import { providerOfferToCatalogEntry } from "./catalog-map.ts";
 import { OpenSmmError } from "./errors.ts";
 import { newId, nowIso } from "./ids.ts";
-import { MetricsRecorder } from "./metrics.ts";
+import { MetricsRecorder, type MetricsState } from "./metrics.ts";
 import { quoteAmount } from "./money.ts";
 import { PaymentRejectedError, type PaymentRail } from "./payment-rail.ts";
 import { ProviderRegistry, type ProviderNode } from "./provider-registry.ts";
@@ -26,6 +26,7 @@ import type {
   CreateOrderInput,
   CreateQuoteInput,
   Money,
+  NodeLifecycle,
   Order,
   PaymentIntent,
   PaymentMethod,
@@ -66,18 +67,55 @@ export type ProviderFactory = (
 
 const TERMINAL_EXECUTION = new Set(["COMPLETED", "CANCELED", "ERROR"]);
 
-interface QuoteRecord {
+export interface QuoteRecord {
   quote: Quote;
   parameters: Record<string, unknown>;
   consumedByOrderId?: string;
 }
 
-interface IdempotencyRecord {
+export interface IdempotencyRecord {
   requestHash: string;
   orderId: string;
 }
 
-interface ExecutionRecord {
+/** Everything needed to rebuild a self-registered node after a restart. */
+export interface NodeSnapshot {
+  providerId: string;
+  providerKey: string;
+  lifecycle: NodeLifecycle;
+  displayName?: string;
+  publiclyListed: boolean;
+  payoutAddress?: string;
+  registeredAt: string;
+  lastHealthcheckAt?: string;
+  registrationInput: RegisterProviderInput;
+}
+
+/**
+ * Full gateway state snapshot (persistence). Contains provider credentials
+ * inside nodes[].registrationInput — protect the state file like a secret
+ * (the built-in store writes it with mode 0600).
+ */
+export interface CoreSnapshot {
+  format: 1;
+  savedAt: string;
+  quotes: [string, QuoteRecord][];
+  orders: Order[];
+  payments: PaymentIntent[];
+  executions: [string, ExecutionRecord][];
+  refills: [string, string][];
+  idempotency: [string, IdempotencyRecord][];
+  metrics: MetricsState;
+  nodes: NodeSnapshot[];
+}
+
+/** Rebuilds a provider adapter from its registration input (no healthcheck). */
+export type ProviderBuilder = (
+  input: RegisterProviderInput,
+  providerId: string,
+) => OpenSmmProvider | Promise<OpenSmmProvider>;
+
+export interface ExecutionRecord {
   externalExecutionId: string;
   /** Epoch ms when the provider accepted the submission. */
   submittedAt: number;
@@ -294,6 +332,8 @@ export class OpenSmmCore {
       // volume-capped until gateway-measured metrics earn ACTIVE.
       lifecycle: "UNVERIFIED",
       endpoint: input.endpoint,
+      // Kept for state restore; never exposed through the protocol.
+      registrationInput: input,
       ...(input.displayName !== undefined ? { displayName: input.displayName } : {}),
       publiclyListed: input.publiclyListed ?? false,
       ...(input.payoutAddress !== undefined ? { payoutAddress: input.payoutAddress } : {}),
@@ -886,5 +926,100 @@ export class OpenSmmCore {
     } catch {
       // Polling failure never moves the order backwards; keep last known status.
     }
+  }
+
+  // --- state persistence -----------------------------------------------------
+
+  /**
+   * Snapshot of the full gateway state (orders, payments, executions,
+   * idempotency, metrics, self-registered nodes). Bootstrap providers are NOT
+   * included — they are recreated from env config on boot.
+   */
+  exportState(): CoreSnapshot {
+    return {
+      format: 1,
+      savedAt: nowIso(),
+      quotes: [...this.quotes.entries()],
+      orders: [...this.orders.values()],
+      payments: [...this.payments.values()],
+      executions: [...this.executions.entries()],
+      refills: [...this.refills.entries()],
+      idempotency: [...this.idempotency.entries()],
+      metrics: this.metrics.exportState(),
+      nodes: this.registry
+        .list()
+        .filter((n) => n.registrationInput !== undefined)
+        .map((n) => {
+          const node: NodeSnapshot = {
+            providerId: n.providerId,
+            providerKey: n.providerKey,
+            lifecycle: n.lifecycle,
+            publiclyListed: n.publiclyListed,
+            registeredAt: n.registeredAt,
+            registrationInput: n.registrationInput!,
+            ...(n.displayName !== undefined ? { displayName: n.displayName } : {}),
+            ...(n.payoutAddress !== undefined ? { payoutAddress: n.payoutAddress } : {}),
+            ...(n.lastHealthcheckAt !== undefined ? { lastHealthcheckAt: n.lastHealthcheckAt } : {}),
+          };
+          return node;
+        }),
+    };
+  }
+
+  /**
+   * Restore a snapshot. Adapters are rebuilt through `buildProvider` (no
+   * healthcheck): a node whose offers cannot be listed right now comes back
+   * as SUSPENDED and the supervisor reactivates it on the next good sync.
+   */
+  async importState(snapshot: CoreSnapshot, buildProvider: ProviderBuilder): Promise<{ restoredNodes: number }> {
+    if (snapshot.format !== 1) {
+      throw new OpenSmmError("INTERNAL", `unsupported state format: ${snapshot.format}`);
+    }
+    for (const [k, v] of snapshot.quotes) this.quotes.set(k, v);
+    for (const order of snapshot.orders) this.orders.set(order.orderId, order);
+    for (const intent of snapshot.payments) this.payments.set(intent.paymentIntentId, intent);
+    for (const [k, v] of snapshot.executions) this.executions.set(k, v);
+    for (const [k, v] of snapshot.refills) this.refills.set(k, v);
+    for (const [k, v] of snapshot.idempotency) this.idempotency.set(k, v);
+    this.metrics.importState(snapshot.metrics);
+
+    let restoredNodes = 0;
+    for (const node of snapshot.nodes) {
+      if (this.registry.get(node.providerId)) continue; // already live (env config)
+      let provider: OpenSmmProvider;
+      try {
+        provider = await buildProvider(node.registrationInput, node.providerId);
+      } catch {
+        continue; // unrebuildable adapter config — skip, do not lose the rest
+      }
+      this.registry.register({
+        providerId: node.providerId,
+        provider,
+        providerKey: node.providerKey,
+        lifecycle: node.lifecycle,
+        endpoint: node.registrationInput.endpoint,
+        registrationInput: node.registrationInput,
+        ...(node.displayName !== undefined ? { displayName: node.displayName } : {}),
+        publiclyListed: node.publiclyListed,
+        ...(node.payoutAddress !== undefined ? { payoutAddress: node.payoutAddress } : {}),
+        registeredAt: node.registeredAt,
+        ...(node.lastHealthcheckAt !== undefined ? { lastHealthcheckAt: node.lastHealthcheckAt } : {}),
+      });
+      try {
+        const offers = await provider.listOffers();
+        if (!this.catalog.syncProvider) {
+          throw new OpenSmmError("INTERNAL", "catalog does not support provider sync");
+        }
+        this.catalog.syncProvider(
+          node.providerId,
+          offers.map((offer) => providerOfferToCatalogEntry(offer, node.providerId)),
+        );
+      } catch {
+        // Provider unreachable at boot: keep it SUSPENDED, supervisor recovers it.
+        this.registry.setLifecycle(node.providerId, "SUSPENDED");
+      }
+      restoredNodes += 1;
+    }
+    return { restoredNodes };
   }
 }

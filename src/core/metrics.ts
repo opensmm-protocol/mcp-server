@@ -30,6 +30,9 @@ interface ProviderCounters {
   retentionRatios: number[];
 }
 
+/** JSON-serializable per-provider counters, for gateway state persistence. */
+export type MetricsState = Record<string, ProviderCounters>;
+
 /** Latency samples are bounded; old samples drop out of the window. */
 const LATENCY_WINDOW = 256;
 
@@ -118,6 +121,38 @@ export class MetricsRecorder {
         c.retentionRatios.reduce((sum, r) => sum + r, 0) / c.retentionRatios.length;
     }
     return metrics;
+  }
+
+  /** Snapshot of all counters (gateway state persistence). */
+  exportState(): MetricsState {
+    return Object.fromEntries(
+      [...this.counters.entries()].map(([id, c]) => [
+        id,
+        { ...c, outcomes: { ...c.outcomes }, startLatenciesSec: [...c.startLatenciesSec], completionLatenciesSec: [...c.completionLatenciesSec], retentionRatios: [...c.retentionRatios] },
+      ]),
+    );
+  }
+
+  /** Restore counters from a snapshot. Merges into an empty recorder. */
+  importState(state: MetricsState): void {
+    for (const [providerId, c] of Object.entries(state)) {
+      this.counters.set(providerId, {
+        submissions: c.submissions ?? 0,
+        rejections: c.rejections ?? 0,
+        outcomes: {
+          COMPLETED: 0,
+          PARTIAL: 0,
+          CANCELED: 0,
+          ERROR: 0,
+          ...(c.outcomes as Partial<Record<TerminalOutcome, number>>),
+        },
+        orderedUnits: c.orderedUnits ?? 0,
+        deliveredUnits: c.deliveredUnits ?? 0,
+        startLatenciesSec: c.startLatenciesSec ?? [],
+        completionLatenciesSec: c.completionLatenciesSec ?? [],
+        retentionRatios: c.retentionRatios ?? [],
+      });
+    }
   }
 
   private for(providerId: string): ProviderCounters {

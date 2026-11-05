@@ -52,6 +52,7 @@
     "rest": "node --env-file-if-exists=.env src/adapters/inbound/rest/server.ts",
     "mcp": "node --env-file-if-exists=.env src/adapters/inbound/mcp/server.ts",
     "mcp:http": "node --env-file-if-exists=.env src/adapters/inbound/mcp/http.ts",
+    "gateway": "node --env-file-if-exists=.env src/adapters/inbound/gateway.ts",
     "prepublishOnly": "npm run typecheck && npm test"
   },
   "dependencies": {

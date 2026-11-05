@@ -77,7 +77,10 @@ MCP over stdio (local agents) and Streamable HTTP (hosted gateway, e.g. `https:/
 ```bash
 npm run mcp         # stdio — point your MCP client at this process
 npm run mcp:http    # http://localhost:3200/mcp — stateless Streamable HTTP, open CORS
+npm run gateway     # http://localhost:8080 — both bindings in one process (deploy shape)
 ```
+
+Production deployment (Docker, TLS, state persistence): [`docs/DEPLOY.md`](./docs/DEPLOY.md).
 
 ## Connecting a live provider (rest-v1)
 

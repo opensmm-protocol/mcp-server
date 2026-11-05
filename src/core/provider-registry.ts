@@ -7,7 +7,7 @@
  */
 
 import type { OpenSmmProvider } from "./provider-spi.ts";
-import type { NodeLifecycle } from "./types.ts";
+import type { NodeLifecycle, RegisterProviderInput } from "./types.ts";
 
 export type { NodeLifecycle } from "./types.ts";
 
@@ -23,6 +23,13 @@ export interface ProviderNode {
   payoutAddress?: string;
   /** Registration endpoint; used for idempotent re-registration, never published. */
   endpoint?: string;
+  /**
+   * Original registration input for self-registered nodes (spec/v0 §10).
+   * Stored so the node can be rebuilt after a gateway restart. Contains the
+   * provider credential — never exposed through the protocol, and any state
+   * file holding it must be protected like a secret.
+   */
+  registrationInput?: RegisterProviderInput;
   registeredAt: string;
   lastHealthcheckAt?: string;
 }
@@ -36,11 +43,12 @@ const KEY_WORDS = [
 export class ProviderRegistry {
   private readonly nodes = new Map<string, ProviderNode>();
 
-  register(node: Omit<ProviderNode, "providerKey">): ProviderNode {
+  register(node: Omit<ProviderNode, "providerKey"> & { providerKey?: string }): ProviderNode {
     if (this.nodes.has(node.providerId)) {
       throw new Error(`provider already registered: ${node.providerId}`);
     }
-    const full: ProviderNode = { ...node, providerKey: this.nextKey() };
+    // Explicit key: state restore — pseudonymous keys must survive restarts.
+    const full: ProviderNode = { ...node, providerKey: node.providerKey ?? this.nextKey() };
     this.nodes.set(full.providerId, full);
     return full;
   }

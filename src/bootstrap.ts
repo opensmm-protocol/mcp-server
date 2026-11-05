@@ -13,17 +13,21 @@
  *   OPENSMM_SYNC_INTERVAL_MS / OPENSMM_POLL_INTERVAL_MS — supervision cadence
  *   OPENSMM_SUPERVISOR=0       — disable background supervision (default: on
  *                                for live providers, off for the mock stack)
+ *   OPENSMM_STATE_FILE         — path to the JSON state snapshot; when set,
+ *                                state is restored on boot and autosaved
+ *   OPENSMM_STATE_SAVE_MS      — autosave cadence (default 30000)
  */
 
 import { InMemoryCatalog } from "./core/catalog.ts";
 import { OpenSmmCore, type CoreOptions } from "./core/core.ts";
 import type { OpenSmmProvider } from "./core/provider-spi.ts";
+import { StateFile } from "./core/state-file.ts";
 import { NodeSupervisor } from "./core/supervisor.ts";
 import { MockProvider } from "./adapters/providers/mock/index.ts";
 import { MOCK_CATALOG_VERSION, mockCatalogEntries } from "./adapters/providers/mock/seed.ts";
 import { RestV1Provider } from "./adapters/providers/rest-v1/index.ts";
 import { providerOfferToCatalogEntry } from "./core/catalog-map.ts";
-import { defaultProviderFactory } from "./adapters/providers/factory.ts";
+import { buildProviderAdapter, defaultProviderFactory } from "./adapters/providers/factory.ts";
 
 export interface DevStack {
   core: OpenSmmCore;
@@ -35,6 +39,30 @@ export interface Stack {
   core: OpenSmmCore;
   provider: OpenSmmProvider;
   supervisor: NodeSupervisor;
+  stateFile?: StateFile;
+}
+
+/**
+ * When OPENSMM_STATE_FILE is set: restore orders/metrics/self-registered
+ * nodes from the snapshot and start autosaving. The state file contains
+ * provider credentials — it is written with mode 0600 (spec/v0 §10.3).
+ */
+async function attachPersistence(core: OpenSmmCore): Promise<StateFile | undefined> {
+  const path = process.env.OPENSMM_STATE_FILE;
+  if (!path) return undefined;
+  const stateFile = new StateFile(path);
+  const snapshot = stateFile.load();
+  if (snapshot) {
+    const { restoredNodes } = await core.importState(snapshot, buildProviderAdapter);
+    if (restoredNodes > 0) {
+      console.error(`opensmm: restored ${restoredNodes} node(s) from ${path}`);
+    }
+  }
+  stateFile.startAutosave(
+    () => core.exportState(),
+    Number(process.env.OPENSMM_STATE_SAVE_MS ?? 30_000),
+  );
+  return stateFile;
 }
 
 function coreOptionsFromEnv(): Pick<CoreOptions, "providerFactory" | "ssrf"> {
@@ -69,7 +97,9 @@ export async function createStackFromEnv(
   const baseUrl = process.env.OPENSMM_REST_V1_BASE_URL;
   const apiKey = process.env.OPENSMM_REST_V1_API_KEY;
   if (!baseUrl || !apiKey) {
-    return createDevStack();
+    const dev = createDevStack();
+    const stateFile = await attachPersistence(dev.core);
+    return { ...dev, ...(stateFile ? { stateFile } : {}) };
   }
 
   const providerId = process.env.OPENSMM_PROVIDER_ID ?? "rest-v1";
@@ -112,5 +142,6 @@ export async function createStackFromEnv(
   if (process.env.OPENSMM_SUPERVISOR !== "0") {
     supervisor.start();
   }
-  return { core, provider, supervisor };
+  const stateFile = await attachPersistence(core);
+  return { core, provider, supervisor, ...(stateFile ? { stateFile } : {}) };
 }
