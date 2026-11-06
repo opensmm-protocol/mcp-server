@@ -16,6 +16,15 @@
  *   OPENSMM_STATE_FILE         — path to the JSON state snapshot; when set,
  *                                state is restored on boot and autosaved
  *   OPENSMM_STATE_SAVE_MS      — autosave cadence (default 30000)
+ *
+ * x402 payment rail (when X402_FACILITATOR_URL is set, replaces the dev-only
+ * mock rail — see docs/X402_TESTNET.md):
+ *   X402_FACILITATOR_URL       — facilitator base URL (testnet:
+ *                                https://x402.org/facilitator)
+ *   X402_PAYTO_ADDRESS         — gateway's receiving address (required)
+ *   X402_FACILITATOR_API_KEY   — Bearer token for auth-gated facilitators (CDP)
+ *   X402_NETWORK               — CAIP-2 network (default eip155:84532, Base Sepolia)
+ *   X402_USDC_ADDRESS          — USDC contract override (known: Base, Base Sepolia)
  */
 
 import { InMemoryCatalog } from "./core/catalog.ts";
@@ -28,6 +37,8 @@ import { MOCK_CATALOG_VERSION, mockCatalogEntries } from "./adapters/providers/m
 import { RestV1Provider } from "./adapters/providers/rest-v1/index.ts";
 import { providerOfferToCatalogEntry } from "./core/catalog-map.ts";
 import { buildProviderAdapter, defaultProviderFactory } from "./adapters/providers/factory.ts";
+import { X402Rail } from "./adapters/payments/x402/index.ts";
+import { HttpFacilitator } from "./adapters/payments/x402/facilitator-http.ts";
 
 export interface DevStack {
   core: OpenSmmCore;
@@ -72,6 +83,33 @@ function coreOptionsFromEnv(): Pick<CoreOptions, "providerFactory" | "ssrf"> {
   };
 }
 
+/**
+ * When X402_FACILITATOR_URL is set, payments go through a real x402
+ * facilitator and the dev-only mock rail is disabled. Without it the stack
+ * keeps the mock rail, so local dev and tests never need keys.
+ */
+function paymentsFromEnv(): Pick<CoreOptions, "paymentMethods" | "rails"> {
+  const facilitatorUrl = process.env.X402_FACILITATOR_URL;
+  if (!facilitatorUrl) return { paymentMethods: ["mock"] };
+  const payTo = process.env.X402_PAYTO_ADDRESS;
+  if (!payTo) {
+    throw new Error("X402_FACILITATOR_URL is set but X402_PAYTO_ADDRESS is missing");
+  }
+  const facilitator = new HttpFacilitator({
+    url: facilitatorUrl,
+    ...(process.env.X402_FACILITATOR_API_KEY
+      ? { apiKey: process.env.X402_FACILITATOR_API_KEY }
+      : {}),
+    ...(process.env.X402_USDC_ADDRESS ? { usdcAddress: process.env.X402_USDC_ADDRESS } : {}),
+  });
+  const rail = new X402Rail({
+    payTo,
+    ...(process.env.X402_NETWORK ? { network: process.env.X402_NETWORK } : {}),
+    facilitator,
+  });
+  return { paymentMethods: ["x402"], rails: [rail] };
+}
+
 export function createDevStack(): DevStack {
   const provider = new MockProvider();
   const catalog = new InMemoryCatalog(mockCatalogEntries, MOCK_CATALOG_VERSION);
@@ -97,9 +135,29 @@ export async function createStackFromEnv(
   const baseUrl = process.env.OPENSMM_REST_V1_BASE_URL;
   const apiKey = process.env.OPENSMM_REST_V1_API_KEY;
   if (!baseUrl || !apiKey) {
-    const dev = createDevStack();
-    const stateFile = await attachPersistence(dev.core);
-    return { ...dev, ...(stateFile ? { stateFile } : {}) };
+    const payments = paymentsFromEnv();
+    if (!payments.rails) {
+      const dev = createDevStack();
+      const stateFile = await attachPersistence(dev.core);
+      return { ...dev, ...(stateFile ? { stateFile } : {}) };
+    }
+    // Mock provider + real x402 payments: the testnet settlement shape.
+    const provider = new MockProvider();
+    const catalog = new InMemoryCatalog(mockCatalogEntries, MOCK_CATALOG_VERSION);
+    const core = new OpenSmmCore({
+      catalog,
+      providers: [provider],
+      ...payments,
+      ...coreOptionsFromEnv(),
+    });
+    const supervisor = new NodeSupervisor({
+      registry: core.registry,
+      catalog: core.catalog,
+      pollActiveOrders: () => core.refreshActiveOrders(),
+      runRetentionChecks: () => core.runRetentionChecks(),
+    });
+    const stateFile = await attachPersistence(core);
+    return { core, provider, supervisor, ...(stateFile ? { stateFile } : {}) };
   }
 
   const providerId = process.env.OPENSMM_PROVIDER_ID ?? "rest-v1";
@@ -113,7 +171,7 @@ export async function createStackFromEnv(
   const core = new OpenSmmCore({
     catalog,
     providers: [provider],
-    paymentMethods: ["mock"],
+    ...paymentsFromEnv(),
     ...(process.env.OPENSMM_RETENTION_CHECK_MS
       ? { retentionCheckMs: Number(process.env.OPENSMM_RETENTION_CHECK_MS) }
       : {}),
