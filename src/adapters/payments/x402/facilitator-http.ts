@@ -23,6 +23,17 @@ export const USDC_ADDRESSES: Record<string, string> = {
   "eip155:84532": "0x036CbD53842c5426634e7929541eC2318f3dCF7e", // Base Sepolia
 };
 
+/**
+ * EIP-712 domain of each network's USDC contract. The facilitator derives the
+ * domain from `extra` when verifying the payer's signature, so the name must
+ * match the token contract exactly: "USDC"/"2" on Base Sepolia,
+ * "USD Coin"/"2" on Base mainnet.
+ */
+export const USDC_EIP712_DOMAINS: Record<string, { name: string; version: string }> = {
+  "eip155:8453": { name: "USD Coin", version: "2" }, // Base mainnet
+  "eip155:84532": { name: "USDC", version: "2" }, // Base Sepolia
+};
+
 export const DEFAULT_FACILITATOR_TIMEOUT_MS = 90_000;
 export const DEFAULT_MAX_TIMEOUT_SECONDS = 300;
 
@@ -36,6 +47,8 @@ export interface WirePaymentRequirements {
   asset: string;
   payTo: string;
   maxTimeoutSeconds: number;
+  /** EIP-712 domain of the asset contract; without it the facilitator rejects the payload. */
+  extra: { name: string; version: string };
 }
 
 export interface HttpFacilitatorOptions {
@@ -47,6 +60,8 @@ export interface HttpFacilitatorOptions {
   timeoutMs?: number;
   /** USDC contract override for networks outside USDC_ADDRESSES. */
   usdcAddress?: string;
+  /** EIP-712 domain override for the asset contract (defaults per network). */
+  eip712Domain?: { name: string; version: string };
   maxTimeoutSeconds?: number;
   /** Test seam. */
   fetchImpl?: typeof fetch;
@@ -69,7 +84,11 @@ interface SettleResponse {
 /** Translate the internal requirement to the facilitator wire shape. */
 export function toWireRequirements(
   requirement: PaymentRequirement,
-  options: { usdcAddress?: string; maxTimeoutSeconds?: number } = {},
+  options: {
+    usdcAddress?: string;
+    eip712Domain?: { name: string; version: string };
+    maxTimeoutSeconds?: number;
+  } = {},
 ): WirePaymentRequirements {
   if (!requirement.network) {
     throw new PaymentRejectedError("x402 requirement has no network");
@@ -83,6 +102,10 @@ export function toWireRequirements(
       `no USDC contract address known for network ${requirement.network}`,
     );
   }
+  const extra =
+    options.eip712Domain ??
+    USDC_EIP712_DOMAINS[requirement.network] ??
+    { name: "USDC", version: "2" };
   return {
     scheme: "exact",
     network: requirement.network,
@@ -92,6 +115,7 @@ export function toWireRequirements(
     asset,
     payTo: requirement.payTo,
     maxTimeoutSeconds: options.maxTimeoutSeconds ?? DEFAULT_MAX_TIMEOUT_SECONDS,
+    extra,
   };
 }
 
@@ -100,6 +124,7 @@ export class HttpFacilitator implements X402Facilitator {
   private readonly apiKey?: string;
   private readonly timeoutMs: number;
   private readonly usdcAddress?: string;
+  private readonly eip712Domain?: { name: string; version: string };
   private readonly maxTimeoutSeconds: number;
   private readonly fetchImpl: typeof fetch;
 
@@ -108,6 +133,7 @@ export class HttpFacilitator implements X402Facilitator {
     this.apiKey = options.apiKey;
     this.timeoutMs = options.timeoutMs ?? DEFAULT_FACILITATOR_TIMEOUT_MS;
     this.usdcAddress = options.usdcAddress;
+    this.eip712Domain = options.eip712Domain;
     this.maxTimeoutSeconds = options.maxTimeoutSeconds ?? DEFAULT_MAX_TIMEOUT_SECONDS;
     this.fetchImpl = options.fetchImpl ?? fetch;
   }
@@ -115,6 +141,7 @@ export class HttpFacilitator implements X402Facilitator {
   private wire(requirement: PaymentRequirement): WirePaymentRequirements {
     return toWireRequirements(requirement, {
       ...(this.usdcAddress ? { usdcAddress: this.usdcAddress } : {}),
+      ...(this.eip712Domain ? { eip712Domain: this.eip712Domain } : {}),
       maxTimeoutSeconds: this.maxTimeoutSeconds,
     });
   }

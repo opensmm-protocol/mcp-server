@@ -4,7 +4,7 @@
  * Run once: node scripts/create-wallet.ts
  */
 
-import { appendFileSync, existsSync, readFileSync } from "node:fs";
+import { appendFileSync, chmodSync, existsSync, readFileSync } from "node:fs";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 
 const ENV_PATH = new URL("../.env", import.meta.url).pathname;
@@ -29,8 +29,13 @@ appendFileSync(
   ].join("\n"),
   { mode: 0o600 },
 );
+// `mode` only applies when the file is created; an existing .env (the common
+// case — provider keys live there) keeps its old permissions otherwise.
+chmodSync(ENV_PATH, 0o600);
 
 console.log(`x402 receiving address (safe to share): ${account.address}`);
 console.log(`Network: eip155:84532 (Base Sepolia testnet)`);
 console.log(`Private key written to .env (chmod 600, gitignored). Back it up securely.`);
-console.log(`Next: fund the address with testnet ETH/USDC from a Base Sepolia faucet.`);
+console.log(
+  `Next: fund the address with Base Sepolia testnet USDC (faucet.circle.com) — no ETH needed, the facilitator sponsors gas.`,
+);

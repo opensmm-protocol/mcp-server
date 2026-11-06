@@ -68,6 +68,12 @@ npm run gateway     # or: npm run rest / npm run mcp:http
 carries a real x402 payment requirement (network, USDC asset, `payTo`,
 amount). Settling with `method: "mock"` is rejected in this configuration.
 
+Each requirement is translated to the facilitator wire shape with `extra:
+{ name, version }` — the USDC contract's EIP-712 domain, which the payer must
+sign with and the facilitator derives verification from: `USDC`/`2` on Base
+Sepolia, `USD Coin`/`2` on Base mainnet. Without it the facilitator answers
+`invalid_exact_evm_missing_eip712_domain`.
+
 ## 4. Fire the live payment
 
 ```bash

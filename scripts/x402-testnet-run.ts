@@ -19,9 +19,6 @@ import { createStackFromEnv } from "../src/bootstrap.ts";
 import { toWireRequirements } from "../src/adapters/payments/x402/facilitator-http.ts";
 import type { PaymentRequirement } from "../src/core/types.ts";
 
-/** EIP-712 domain name of USDC per chain id ("USDC" on testnet, "USD Coin" on mainnet). */
-const USDC_DOMAIN_NAMES: Record<number, string> = { 8453: "USD Coin", 84532: "USDC" };
-
 function required(name: string): string {
   const value = process.env[name];
   if (!value) {
@@ -68,7 +65,6 @@ async function main(): Promise<void> {
 
   // 3. sign EIP-3009 transferWithAuthorization
   const wire = toWireRequirements(requirement);
-  const domainName = USDC_DOMAIN_NAMES[chainId] ?? "USDC";
   const now = Math.floor(Date.now() / 1000);
   const authorization = {
     from: payer.address,
@@ -80,8 +76,8 @@ async function main(): Promise<void> {
   };
   const signature = await payer.signTypedData({
     domain: {
-      name: domainName,
-      version: "2",
+      name: wire.extra.name,
+      version: wire.extra.version,
       chainId,
       verifyingContract: wire.asset as `0x${string}`,
     },
