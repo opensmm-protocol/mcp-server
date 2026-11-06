@@ -29,7 +29,7 @@ export const CURATED_MAX_RATING = 5;
 const moneySchema = z.strictObject({
   value: z
     .string()
-    .regex(/^\d+(\.\d{1,6})?$/, "must be a decimal string with at most 6 fraction digits"),
+    .regex(/^\d{1,7}(\.\d{1,6})?$/, "must be a decimal string with at most 6 fraction digits"),
   currency: z.string().min(1).max(16),
 });
 

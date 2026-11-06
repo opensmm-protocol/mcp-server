@@ -45,6 +45,7 @@ import { X402Rail } from "./adapters/payments/x402/index.ts";
 import { HttpFacilitator } from "./adapters/payments/x402/facilitator-http.ts";
 import {
   assertCuratedProviders,
+  CuratedCatalogError,
   loadCuratedCatalog,
   type LoadedCuratedCatalog,
 } from "./core/curated-catalog.ts";
@@ -141,16 +142,25 @@ function paymentsFromEnv(): Pick<CoreOptions, "paymentMethods" | "rails"> {
  * Curated public catalog (README «Public MVP»). Optional: without
  * OPENSMM_CURATED_CATALOG the catalog is built exactly as before. A broken
  * file is fatal — a public catalog is either fully reviewed or not served.
+ *
+ * Example records are a stub for local development. `allowExamples` is false
+ * as soon as a live provider is configured: a real gateway must not serve
+ * placeholders that a buyer cannot tell apart from a sellable service.
  */
-function curatedCatalogFromEnv(): LoadedCuratedCatalog | undefined {
+function curatedCatalogFromEnv(allowExamples: boolean): LoadedCuratedCatalog | undefined {
   const path = process.env.OPENSMM_CURATED_CATALOG;
   if (!path) return undefined;
   const loaded = loadCuratedCatalog(path);
-  if (loaded.exampleCount > 0) {
-    console.error(
-      `opensmm: curated catalog ${path} contains ${loaded.exampleCount} example record(s) — do not use in production`,
-    );
+  if (loaded.exampleCount === 0) return loaded;
+  if (!allowExamples) {
+    throw new CuratedCatalogError(path, [
+      `contains ${loaded.exampleCount} example record(s); remove them before ` +
+        "configuring a live provider (OPENSMM_REST_V1_BASE_URL)",
+    ]);
   }
+  console.error(
+    `opensmm: curated catalog ${path} contains ${loaded.exampleCount} example record(s) — do not use in production`,
+  );
   return loaded;
 }
 
@@ -176,9 +186,10 @@ export function createDevStack(): DevStack {
 export async function createStackFromEnv(
   overrides: Partial<CoreOptions> = {},
 ): Promise<Stack> {
-  const curated = curatedCatalogFromEnv();
   const baseUrl = process.env.OPENSMM_REST_V1_BASE_URL;
   const apiKey = process.env.OPENSMM_REST_V1_API_KEY;
+  // Example records are allowed only while no live provider is configured.
+  const curated = curatedCatalogFromEnv(!(baseUrl && apiKey));
   if (!baseUrl || !apiKey) {
     const payments = paymentsFromEnv();
     if (!payments.rails && !curated) {
@@ -211,10 +222,17 @@ export async function createStackFromEnv(
   const providerId = process.env.OPENSMM_PROVIDER_ID ?? "rest-v1";
   const provider = new RestV1Provider({ providerId, baseUrl, apiKey });
   assertCuratedProviders(curated, [providerId]);
-  const offers = await provider.listOffers();
-  const catalog =
-    curated?.catalog ??
-    new InMemoryCatalog(offers.map((offer) => providerOfferToCatalogEntry(offer, providerId)));
+  // A curated catalog boots without any provider API call; the live sync
+  // below is the alternative source of the same catalog.
+  let catalog: InMemoryCatalog;
+  if (curated) {
+    catalog = curated.catalog;
+  } else {
+    const offers = await provider.listOffers();
+    catalog = new InMemoryCatalog(
+      offers.map((offer) => providerOfferToCatalogEntry(offer, providerId)),
+    );
+  }
   const listedName = process.env.OPENSMM_PROVIDER_LISTED_NAME;
   const payout = process.env.OPENSMM_PROVIDER_PAYOUT;
   const core = new OpenSmmCore({

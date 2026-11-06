@@ -42,7 +42,11 @@ function writeCatalog(data: unknown): string {
 }
 
 /** Run `fn` with the curated env var set, restoring the environment afterwards. */
-async function withCuratedEnv<T>(value: string | undefined, fn: () => Promise<T>): Promise<T> {
+async function withCuratedEnv<T>(
+  value: string | undefined,
+  fn: () => Promise<T>,
+  extraEnv: Record<string, string> = {},
+): Promise<T> {
   const saved = {
     curated: process.env.OPENSMM_CURATED_CATALOG,
     baseUrl: process.env.OPENSMM_REST_V1_BASE_URL,
@@ -54,6 +58,7 @@ async function withCuratedEnv<T>(value: string | undefined, fn: () => Promise<T>
   delete process.env.X402_FACILITATOR_URL;
   if (value === undefined) delete process.env.OPENSMM_CURATED_CATALOG;
   else process.env.OPENSMM_CURATED_CATALOG = value;
+  for (const [key, envValue] of Object.entries(extraEnv)) process.env[key] = envValue;
   try {
     return await fn();
   } finally {
@@ -218,9 +223,36 @@ describe("curated public catalog", () => {
   it("does not let provider sync overwrite the curated set", async () => {
     const stack = await withCuratedEnv(STUB_PATH, () => createStackFromEnv());
     const report = await stack.supervisor.tickSync("mock");
-    assert.equal(report.ok, false);
-    assert.match(report.error ?? "", /catalog sync disabled/);
+    assert.equal(report.ok, true);
+    assert.equal(report.skipped, true);
+    assert.equal(report.error, undefined);
     assert.equal(stack.core.catalog.list().length, 3);
+  });
+
+  it("boots from a curated catalog without calling the provider", async () => {
+    const file = stubFile();
+    for (const entry of file.entries) {
+      delete entry.example;
+      entry.provenance.providerId = "rest-v1";
+    }
+    const at = writeCatalog(file);
+    const stack = await withCuratedEnv(at, () => createStackFromEnv(), {
+      // Unreachable on purpose: the curated path must not call listOffers().
+      OPENSMM_REST_V1_BASE_URL: "https://127.0.0.1:1/api/v1",
+      OPENSMM_REST_V1_API_KEY: "test-key",
+    });
+    assert.equal(stack.core.catalog.list().length, 3);
+    stack.supervisor.stop();
+  });
+
+  it("refuses example records once a live provider is configured", async () => {
+    await assert.rejects(
+      withCuratedEnv(STUB_PATH, () => createStackFromEnv(), {
+        OPENSMM_REST_V1_BASE_URL: "https://provider.example/api/v1",
+        OPENSMM_REST_V1_API_KEY: "test-key",
+      }),
+      /contains 3 example record\(s\)/,
+    );
   });
 
   it("keeps the mock seed when OPENSMM_CURATED_CATALOG is not set", async () => {

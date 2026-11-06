@@ -25,6 +25,8 @@ export interface SyncReport {
   offersCount?: number;
   error?: string;
   lifecycle: string;
+  /** True when the sync was intentionally skipped (curated catalog mode). */
+  skipped?: boolean;
 }
 
 export interface SupervisorOptions {
@@ -83,12 +85,8 @@ export class NodeSupervisor {
     }
     if (!this.syncCatalog) {
       // Curated catalog: provider sync would overwrite the reviewed set.
-      return {
-        providerId,
-        ok: false,
-        error: "catalog sync disabled (curated catalog)",
-        lifecycle: node.lifecycle,
-      };
+      // Disabled by design, not a failure — keep it out of the error path.
+      return { providerId, ok: true, skipped: true, lifecycle: node.lifecycle };
     }
     if (!this.catalog.syncProvider) {
       return { providerId, ok: false, error: "catalog does not support sync", lifecycle: node.lifecycle };

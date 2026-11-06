@@ -201,6 +201,9 @@ offending path and reason. Enforced rules:
 The checked-in `data/curated-services.json` contains three **example** records
 (telegram members, telegram views, youtube views) copied from the mock seed.
 It exists to exercise the schema and tests — it is not a production catalog.
+As soon as a live provider is configured (`OPENSMM_REST_V1_BASE_URL`), a
+catalog with `example` records is rejected at boot: a public gateway must not
+serve placeholders a buyer cannot tell apart from a sellable service.
 
 ### How to add a service
 
