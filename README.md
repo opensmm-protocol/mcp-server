@@ -47,8 +47,11 @@ Execution providers        ← SMM API v2 panels, native providers, ...
   node registry (pseudonymous keys, lifecycle) and the SSRF guard behind
   `registerProvider`.
 - `src/adapters/payments/x402/` — x402 payment rail (USDC on Base) behind a
-  facilitator interface; ships with a mock facilitator for tests. The core only
-  knows the `PaymentRail` SPI, so TON/CryptoBot plug in the same way.
+  facilitator interface; ships with a mock facilitator for tests, and an HTTP
+  facilitator client (`X402_FACILITATOR_URL`, see
+  [`docs/X402_TESTNET.md`](./docs/X402_TESTNET.md)) for live testnet/mainnet
+  settlement. The core only knows the `PaymentRail` SPI, so TON/CryptoBot plug
+  in the same way.
 
 ## The one rule of the protocol
 
@@ -181,11 +184,13 @@ Key properties (enforced by tests):
 7. ✅ Direct settlement: provider `payoutAddress` becomes the `payTo` of its
      payment requirements — funds flow agent → provider, never through the
      gateway.
-8. 🟡 x402: rail with mock facilitator done (incl. `SETTLEMENT_PENDING`);
-     testnet needs a real facilitator config.
-9. ⬜ Background catalog sync + healthchecks with circuit breaker
+8. 🟡 x402: rail done (incl. `SETTLEMENT_PENDING`) with a real facilitator
+     client configured via env — testnet setup and live-run script in
+     [`docs/X402_TESTNET.md`](./docs/X402_TESTNET.md). First live Base Sepolia
+     payment pending a funded payer key.
+9. ✅ Background catalog sync + healthchecks with circuit breaker
      (`SUSPENDED` on degradation).
-10. ⬜ Gateway-measured metrics feeding the public provider showcase.
+10. ✅ Gateway-measured metrics feeding the public provider showcase.
 11. ⬜ x402 mainnet: real small-amount payment.
 12. ⬜ Public MVP: 30–50 curated services. No account farms, no A2A yet.
 
