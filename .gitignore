@@ -3,7 +3,8 @@ node_modules/
 .DS_Store
 .env
 .env.*
-data/
+data/*
+!data/curated-services.json
 
 # Generated SEO catalog (built by website/build-catalog.mjs, deployed to opensmm.dev repo)
 website/catalog/

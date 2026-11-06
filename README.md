@@ -135,6 +135,99 @@ to call the provider and are never returned. A `payoutAddress` enables direct
 settlement (spec/v0 §8): it becomes the `payTo` of that provider's payment
 requirements — money flows agent → provider, never through the gateway.
 
+## Public MVP: curated catalog
+
+The gateway can serve a **curated catalog** — a hand-reviewed snapshot of
+sellable services — instead of calling a provider on boot. Every record keeps
+its provenance, so each published price can be traced back to the provider
+offer it was copied from.
+
+```bash
+OPENSMM_CURATED_CATALOG=./data/curated-services.json npm run rest
+```
+
+Without `OPENSMM_CURATED_CATALOG` the gateway behaves exactly as before: mock
+seed in local dev, live sync against a configured provider.
+
+### Catalog file format
+
+`data/curated-services.json` holds the wire `Service` (spec/v0 §4) plus a
+`provenance` block and curation metadata:
+
+```json
+{
+  "format": 1,
+  "version": "2026-11-06T00:00:00Z",
+  "entries": [
+    {
+      "example": true,
+      "rating": 4.6,
+      "provenance": {
+        "providerId": "mock",
+        "externalServiceId": "1001",
+        "sourceUrl": "https://example.invalid/mock/services/1001",
+        "syncedAt": "2026-11-06T00:00:00Z"
+      },
+      "service": { "serviceId": "osmm_svc_…", "name": "…" }
+    }
+  ]
+}
+```
+
+- `service` — one record of the wire `Service` model: platform, objective,
+  rate, rate basis, min/max quantity, capabilities.
+- `provenance.providerId` / `externalServiceId` — the provider offer this
+  service maps to; orders route to that provider node.
+- `provenance.sourceUrl` — the provider-side page or API URL the offer came
+  from (`https://` only).
+- `provenance.syncedAt` — when the offer was copied (ISO-8601 UTC).
+- `rating` — optional curator score, 0–5. The wire `Service` has no rating
+  field: spec/v0 publishes gateway-measured metrics only, so this is curation
+  metadata, not a protocol claim.
+- `example` — `true` marks a placeholder record that must never reach a
+  production catalog.
+
+Validation is fail-closed: one bad record stops the gateway at boot with the
+offending path and reason. Enforced rules:
+
+- unique `serviceId`; unique `providerId + externalServiceId` pair;
+- `provenance` is mandatory, `sourceUrl` must be `https://`, `syncedAt` must be
+  an ISO-8601 timestamp;
+- rate value between `0.000001` and `10000` per rate basis, `maxQuantity >=
+  minQuantity`;
+- every `provenance.providerId` must match a provider registered at boot,
+  otherwise the catalog would advertise services the gateway cannot route.
+
+The checked-in `data/curated-services.json` contains three **example** records
+(telegram members, telegram views, youtube views) copied from the mock seed.
+It exists to exercise the schema and tests — it is not a production catalog.
+
+### How to add a service
+
+1. Take a live offer from the provider's own catalog. Do not invent names,
+   prices, limits or capabilities — if the provider catalog is unreachable,
+   stop and escalate instead of filling the gap.
+2. Copy the offer into a `service` record. `serviceId` is gateway-stable: keep
+   it when the price changes, never reuse it for a different offer.
+3. Fill `provenance` (`providerId`, `externalServiceId`, `sourceUrl`,
+   `syncedAt`). `providerId` must be registered on the gateway at boot.
+4. Drop `example` (or set `false`) once the record is real, then run
+   `npm test` and start the gateway with `OPENSMM_CURATED_CATALOG`.
+
+### Curated snapshot vs provider live sync
+
+| | Curated catalog | Provider live sync |
+| --- | --- | --- |
+| Source | reviewed JSON file in the repo | provider API at boot + every 5 min |
+| Boot | no provider call needed | `listOffers` healthcheck |
+| Content | hand-picked subset | everything the provider returns |
+| Price drift | frozen until the file is re-synced | follows the provider |
+| Background sync | disabled (would overwrite the review) | enabled, with circuit breaker |
+
+Both modes serve the same REST `/v0/services` and MCP `search_services`
+surface. Order polling, retention checks and payment rails are unaffected by
+the mode.
+
 ## The acceptance flow
 
 ```text

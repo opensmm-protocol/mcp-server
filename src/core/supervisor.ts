@@ -42,6 +42,12 @@ export interface SupervisorOptions {
   retentionIntervalMs?: number;
   /** Consecutive sync failures that suspend a node. Default 3. */
   failureThreshold?: number;
+  /**
+   * Catalog sync on/off. A curated public catalog is a hand-reviewed
+   * snapshot: syncing provider offers over it would drop the curation.
+   * Default true; healthchecks then stop driving the lifecycle too.
+   */
+  syncCatalog?: boolean;
 }
 
 export class NodeSupervisor {
@@ -53,6 +59,7 @@ export class NodeSupervisor {
   private readonly pollIntervalMs: number;
   private readonly retentionIntervalMs: number;
   private readonly failureThreshold: number;
+  private readonly syncCatalog: boolean;
   private readonly failures = new Map<string, number>();
   private timers: ReturnType<typeof setInterval>[] = [];
 
@@ -65,6 +72,7 @@ export class NodeSupervisor {
     this.pollIntervalMs = options.pollIntervalMs ?? 30 * 1000;
     this.retentionIntervalMs = options.retentionIntervalMs ?? 60 * 60 * 1000;
     this.failureThreshold = options.failureThreshold ?? 3;
+    this.syncCatalog = options.syncCatalog ?? true;
   }
 
   /** Sync one node: refresh its catalog entries and drive the breaker. */
@@ -72,6 +80,15 @@ export class NodeSupervisor {
     const node = this.registry.get(providerId);
     if (!node) {
       return { providerId, ok: false, error: "unknown provider", lifecycle: "SUSPENDED" };
+    }
+    if (!this.syncCatalog) {
+      // Curated catalog: provider sync would overwrite the reviewed set.
+      return {
+        providerId,
+        ok: false,
+        error: "catalog sync disabled (curated catalog)",
+        lifecycle: node.lifecycle,
+      };
     }
     if (!this.catalog.syncProvider) {
       return { providerId, ok: false, error: "catalog does not support sync", lifecycle: node.lifecycle };
@@ -126,9 +143,11 @@ export class NodeSupervisor {
   /** Start interval-driven supervision. Idempotent; timers are unref'd. */
   start(): void {
     if (this.timers.length > 0) return;
-    const sync = setInterval(() => void this.tickSyncAll(), this.syncIntervalMs);
-    sync.unref();
-    this.timers.push(sync);
+    if (this.syncCatalog) {
+      const sync = setInterval(() => void this.tickSyncAll(), this.syncIntervalMs);
+      sync.unref();
+      this.timers.push(sync);
+    }
     if (this.pollActive) {
       const poll = setInterval(() => void this.tickPoll(), this.pollIntervalMs);
       poll.unref();
