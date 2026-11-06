@@ -53,6 +53,7 @@
     "mcp": "node --env-file-if-exists=.env src/adapters/inbound/mcp/server.ts",
     "mcp:http": "node --env-file-if-exists=.env src/adapters/inbound/mcp/http.ts",
     "gateway": "node --env-file-if-exists=.env src/adapters/inbound/gateway.ts",
+    "x402:testnet": "node --env-file-if-exists=.env scripts/x402-testnet-run.ts",
     "prepublishOnly": "npm run typecheck && npm test"
   },
   "dependencies": {

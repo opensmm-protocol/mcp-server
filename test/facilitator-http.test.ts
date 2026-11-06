@@ -1,0 +1,156 @@
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+import {
+  HttpFacilitator,
+  toWireRequirements,
+  USDC_ADDRESSES,
+} from "../src/adapters/payments/x402/facilitator-http.ts";
+import { PaymentRejectedError } from "../src/core/payment-rail.ts";
+import type { PaymentRequirement } from "../src/core/types.ts";
+
+const REQUIREMENT: PaymentRequirement = {
+  method: "x402",
+  network: "eip155:84532",
+  asset: "USDC",
+  amount: { value: "2.412000", currency: "USDC" },
+  payTo: "0xGatewayReceiver",
+};
+
+function stubFetch(handler: (url: string, body: any, headers: any) => unknown): typeof fetch {
+  return (async (url: any, init: any) => {
+    const payload = handler(String(url), JSON.parse(init.body), init.headers);
+    const status = (payload as any)?.__status ?? 200;
+    return new Response(JSON.stringify(payload), { status });
+  }) as typeof fetch;
+}
+
+describe("toWireRequirements", () => {
+  it("maps the internal requirement to the x402 v2 wire shape", () => {
+    const wire = toWireRequirements(REQUIREMENT);
+    assert.equal(wire.scheme, "exact");
+    assert.equal(wire.network, "eip155:84532");
+    assert.equal(wire.asset, USDC_ADDRESSES["eip155:84532"]);
+    assert.equal(wire.payTo, "0xGatewayReceiver");
+    assert.equal(wire.amount, "2412000"); // decimal string → atomic units, exact integer math
+    assert.equal(wire.maxTimeoutSeconds, 300);
+  });
+
+  it("rejects unknown networks unless a USDC address override is given", () => {
+    const alien = { ...REQUIREMENT, network: "eip155:999" };
+    assert.throws(() => toWireRequirements(alien), PaymentRejectedError);
+    const wire = toWireRequirements(alien, { usdcAddress: "0xCustomUsdc" });
+    assert.equal(wire.asset, "0xCustomUsdc");
+  });
+
+  it("requires network and payTo", () => {
+    assert.throws(
+      () => toWireRequirements({ ...REQUIREMENT, network: undefined }),
+      PaymentRejectedError,
+    );
+    assert.throws(
+      () => toWireRequirements({ ...REQUIREMENT, payTo: undefined }),
+      PaymentRejectedError,
+    );
+  });
+});
+
+describe("HttpFacilitator", () => {
+  it("verify forwards the payload and maps a valid answer", async () => {
+    const calls: any[] = [];
+    const facilitator = new HttpFacilitator({
+      url: "https://facilitator.example/",
+      fetchImpl: stubFetch((url, body) => {
+        calls.push({ url, body });
+        return { isValid: true, payer: "0xPayer" };
+      }),
+    });
+    const result = await facilitator.verify({ x402Version: 2 }, REQUIREMENT);
+    assert.deepEqual(result, { valid: true });
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].url, "https://facilitator.example/verify"); // trailing slash normalized
+    assert.equal(calls[0].body.paymentRequirements.asset, USDC_ADDRESSES["eip155:84532"]);
+  });
+
+  it("verify maps an invalid answer to a reason", async () => {
+    const facilitator = new HttpFacilitator({
+      url: "https://facilitator.example",
+      fetchImpl: stubFetch(() => ({
+        isValid: false,
+        invalidReason: "invalid_exact_evm_payload",
+        invalidMessage: "signature must be a string",
+      })),
+    });
+    const result = await facilitator.verify({}, REQUIREMENT);
+    assert.equal(result.valid, false);
+    assert.equal(result.reason, "signature must be a string");
+  });
+
+  it("settle returns settled with the on-chain tx hash", async () => {
+    const facilitator = new HttpFacilitator({
+      url: "https://facilitator.example",
+      fetchImpl: stubFetch(() => ({
+        success: true,
+        transaction: "0xabc123",
+        network: "eip155:84532",
+      })),
+    });
+    const result = await facilitator.settle({}, REQUIREMENT);
+    assert.deepEqual(result, { outcome: "settled", txHash: "0xabc123" });
+  });
+
+  it("settle maps settlement_pending to a non-terminal pending outcome", async () => {
+    const facilitator = new HttpFacilitator({
+      url: "https://facilitator.example",
+      fetchImpl: stubFetch(() => ({
+        success: false,
+        errorReason: "settlement_pending",
+        transaction: "0xpendingtx",
+        network: "eip155:84532",
+      })),
+    });
+    const result = await facilitator.settle({}, REQUIREMENT);
+    assert.deepEqual(result, { outcome: "pending", txHash: "0xpendingtx" });
+  });
+
+  it("settle throws PaymentRejectedError on a definitive failure", async () => {
+    const facilitator = new HttpFacilitator({
+      url: "https://facilitator.example",
+      fetchImpl: stubFetch(() => ({
+        success: false,
+        errorReason: "insufficient_funds",
+        errorMessage: "payer balance too low",
+        transaction: "",
+        network: "eip155:84532",
+      })),
+    });
+    await assert.rejects(
+      () => facilitator.settle({}, REQUIREMENT),
+      (err: unknown) => err instanceof PaymentRejectedError && /balance too low/.test(err.message),
+    );
+  });
+
+  it("HTTP errors surface as plain errors, not payment rejections", async () => {
+    const facilitator = new HttpFacilitator({
+      url: "https://facilitator.example",
+      fetchImpl: stubFetch(() => ({ __status: 500, error: "boom" })),
+    });
+    await assert.rejects(
+      () => facilitator.verify({}, REQUIREMENT),
+      (err: unknown) => !(err instanceof PaymentRejectedError) && /HTTP 500/.test(String(err)),
+    );
+  });
+
+  it("sends the Bearer token when an apiKey is configured", async () => {
+    let seenAuth: string | undefined;
+    const facilitator = new HttpFacilitator({
+      url: "https://facilitator.example",
+      apiKey: "cdp-key",
+      fetchImpl: stubFetch((_url, _body, headers) => {
+        seenAuth = headers["authorization"];
+        return { isValid: true };
+      }),
+    });
+    await facilitator.verify({}, REQUIREMENT);
+    assert.equal(seenAuth, "Bearer cdp-key");
+  });
+});
