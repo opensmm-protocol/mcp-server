@@ -54,8 +54,16 @@ describe("toWireRequirements", () => {
   it("rejects unknown networks unless a USDC address override is given", () => {
     const alien = { ...REQUIREMENT, network: "eip155:999" };
     assert.throws(() => toWireRequirements(alien), PaymentRejectedError);
-    const wire = toWireRequirements(alien, { usdcAddress: "0xCustomUsdc" });
+    assert.throws(
+      () => toWireRequirements(alien, { usdcAddress: "0xCustomUsdc" }),
+      PaymentRejectedError, // domain must be explicit too — no silent Base Sepolia fallback
+    );
+    const wire = toWireRequirements(alien, {
+      usdcAddress: "0xCustomUsdc",
+      eip712Domain: { name: "Custom USD", version: "3" },
+    });
     assert.equal(wire.asset, "0xCustomUsdc");
+    assert.deepEqual(wire.extra, { name: "Custom USD", version: "3" });
   });
 
   it("requires network and payTo", () => {

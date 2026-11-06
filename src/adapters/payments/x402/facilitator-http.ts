@@ -103,9 +103,14 @@ export function toWireRequirements(
     );
   }
   const extra =
-    options.eip712Domain ??
-    USDC_EIP712_DOMAINS[requirement.network] ??
-    { name: "USDC", version: "2" };
+    options.eip712Domain ?? USDC_EIP712_DOMAINS[requirement.network];
+  if (!extra) {
+    // Mirror the asset lookup: guessing the domain would send a foreign
+    // signature domain that only fails later, inside the facilitator.
+    throw new PaymentRejectedError(
+      `no USDC EIP-712 domain known for network ${requirement.network}; pass eip712Domain`,
+    );
+  }
   return {
     scheme: "exact",
     network: requirement.network,

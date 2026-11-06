@@ -57,6 +57,8 @@ Full env reference:
 | `X402_NETWORK` | `eip155:84532` | CAIP-2 network (`eip155:8453` = Base mainnet) |
 | `X402_FACILITATOR_API_KEY` | — | Bearer token for auth-gated facilitators |
 | `X402_USDC_ADDRESS` | built-in table | USDC contract override for other networks |
+| `X402_EIP712_DOMAIN_NAME` | built-in table | EIP-712 domain name of that contract; set together with `X402_USDC_ADDRESS` for networks outside the built-in table (Base Sepolia `USDC`, Base mainnet `USD Coin`) |
+| `X402_EIP712_DOMAIN_VERSION` | built-in table | EIP-712 domain version for the same override, set together with the name |
 
 Then boot as usual — REST, MCP or the combined gateway:
 
@@ -72,7 +74,11 @@ Each requirement is translated to the facilitator wire shape with `extra:
 { name, version }` — the USDC contract's EIP-712 domain, which the payer must
 sign with and the facilitator derives verification from: `USDC`/`2` on Base
 Sepolia, `USD Coin`/`2` on Base mainnet. Without it the facilitator answers
-`invalid_exact_evm_missing_eip712_domain`.
+`invalid_exact_evm_missing_eip712_domain`. For a network outside the built-in
+table the gateway refuses to guess: set `X402_USDC_ADDRESS` together with
+`X402_EIP712_DOMAIN_NAME` / `X402_EIP712_DOMAIN_VERSION`, otherwise the first
+x402 verify/settle fails with a clear "no USDC EIP-712 domain known for
+network" error instead of signing with a foreign domain.
 
 ## 4. Fire the live payment
 
