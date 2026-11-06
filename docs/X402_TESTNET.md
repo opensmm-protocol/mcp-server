@@ -57,6 +57,8 @@ Full env reference:
 | `X402_NETWORK` | `eip155:84532` | CAIP-2 network (`eip155:8453` = Base mainnet) |
 | `X402_FACILITATOR_API_KEY` | — | Bearer token for auth-gated facilitators |
 | `X402_USDC_ADDRESS` | built-in table | USDC contract override for other networks |
+| `X402_EIP712_DOMAIN_NAME` | built-in table | EIP-712 domain name of that contract; set together with `X402_USDC_ADDRESS` for networks outside the built-in table (Base Sepolia `USDC`, Base mainnet `USD Coin`) |
+| `X402_EIP712_DOMAIN_VERSION` | built-in table | EIP-712 domain version for the same override, set together with the name |
 
 Then boot as usual — REST, MCP or the combined gateway:
 
@@ -67,6 +69,16 @@ npm run gateway     # or: npm run rest / npm run mcp:http
 `GET /v0/capabilities` now reports `paymentMethods: ["x402"]`, and every order
 carries a real x402 payment requirement (network, USDC asset, `payTo`,
 amount). Settling with `method: "mock"` is rejected in this configuration.
+
+Each requirement is translated to the facilitator wire shape with `extra:
+{ name, version }` — the USDC contract's EIP-712 domain, which the payer must
+sign with and the facilitator derives verification from: `USDC`/`2` on Base
+Sepolia, `USD Coin`/`2` on Base mainnet. Without it the facilitator answers
+`invalid_exact_evm_missing_eip712_domain`. For a network outside the built-in
+table the gateway refuses to guess: set `X402_USDC_ADDRESS` together with
+`X402_EIP712_DOMAIN_NAME` / `X402_EIP712_DOMAIN_VERSION`, otherwise the first
+x402 verify/settle fails with a clear "no USDC EIP-712 domain known for
+network" error instead of signing with a foreign domain.
 
 ## 4. Fire the live payment
 
@@ -80,7 +92,9 @@ against the mock provider catalog with the real rail:
 1. quotes the default service at its minimum quantity (0.2412 USDC),
 2. creates the order and reads its x402 payment requirement,
 3. signs an EIP-3009 `transferWithAuthorization` with `X402_PRIVATE_KEY`
-   (EIP-712 domain `USDC`/`2` on the network's USDC contract),
+   (EIP-712 domain taken from the requirement's `extra`: `USDC`/`2` on Base
+   Sepolia, `USD Coin`/`2` on Base mainnet, against the network's USDC
+   contract),
 4. submits the payload via `core.settlePayment` → facilitator `/verify` →
    `/settle`,
 5. prints the on-chain tx hash and the execution status.

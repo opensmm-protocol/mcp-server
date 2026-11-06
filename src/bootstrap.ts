@@ -84,6 +84,22 @@ function coreOptionsFromEnv(): Pick<CoreOptions, "providerFactory" | "ssrf"> {
 }
 
 /**
+ * EIP-712 domain override for networks whose USDC contract is not in the
+ * built-in table (paired with X402_USDC_ADDRESS). Both vars or neither.
+ */
+function eip712DomainFromEnv(): { name: string; version: string } | undefined {
+  const name = process.env.X402_EIP712_DOMAIN_NAME;
+  const version = process.env.X402_EIP712_DOMAIN_VERSION;
+  if (!name && !version) return undefined;
+  if (!name || !version) {
+    throw new Error(
+      "X402_EIP712_DOMAIN_NAME and X402_EIP712_DOMAIN_VERSION must be set together",
+    );
+  }
+  return { name, version };
+}
+
+/**
  * When X402_FACILITATOR_URL is set, payments go through a real x402
  * facilitator and the dev-only mock rail is disabled. Without it the stack
  * keeps the mock rail, so local dev and tests never need keys.
@@ -95,12 +111,14 @@ function paymentsFromEnv(): Pick<CoreOptions, "paymentMethods" | "rails"> {
   if (!payTo) {
     throw new Error("X402_FACILITATOR_URL is set but X402_PAYTO_ADDRESS is missing");
   }
+  const eip712Domain = eip712DomainFromEnv();
   const facilitator = new HttpFacilitator({
     url: facilitatorUrl,
     ...(process.env.X402_FACILITATOR_API_KEY
       ? { apiKey: process.env.X402_FACILITATOR_API_KEY }
       : {}),
     ...(process.env.X402_USDC_ADDRESS ? { usdcAddress: process.env.X402_USDC_ADDRESS } : {}),
+    ...(eip712Domain ? { eip712Domain } : {}),
   });
   const rail = new X402Rail({
     payTo,

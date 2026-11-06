@@ -33,13 +33,37 @@ describe("toWireRequirements", () => {
     assert.equal(wire.payTo, "0xGatewayReceiver");
     assert.equal(wire.amount, "2412000"); // decimal string → atomic units, exact integer math
     assert.equal(wire.maxTimeoutSeconds, 300);
+    // The facilitator derives the EIP-712 domain from extra; without it the
+    // real facilitator rejects the payload (invalid_exact_evm_missing_eip712_domain).
+    assert.deepEqual(wire.extra, { name: "USDC", version: "2" });
+  });
+
+  it("uses the mainnet USDC EIP-712 domain name on eip155:8453", () => {
+    const wire = toWireRequirements({ ...REQUIREMENT, network: "eip155:8453" });
+    assert.equal(wire.asset, USDC_ADDRESSES["eip155:8453"]);
+    assert.deepEqual(wire.extra, { name: "USD Coin", version: "2" });
+  });
+
+  it("allows an explicit EIP-712 domain override", () => {
+    const wire = toWireRequirements(REQUIREMENT, {
+      eip712Domain: { name: "Custom USD", version: "1" },
+    });
+    assert.deepEqual(wire.extra, { name: "Custom USD", version: "1" });
   });
 
   it("rejects unknown networks unless a USDC address override is given", () => {
     const alien = { ...REQUIREMENT, network: "eip155:999" };
     assert.throws(() => toWireRequirements(alien), PaymentRejectedError);
-    const wire = toWireRequirements(alien, { usdcAddress: "0xCustomUsdc" });
+    assert.throws(
+      () => toWireRequirements(alien, { usdcAddress: "0xCustomUsdc" }),
+      PaymentRejectedError, // domain must be explicit too — no silent Base Sepolia fallback
+    );
+    const wire = toWireRequirements(alien, {
+      usdcAddress: "0xCustomUsdc",
+      eip712Domain: { name: "Custom USD", version: "3" },
+    });
     assert.equal(wire.asset, "0xCustomUsdc");
+    assert.deepEqual(wire.extra, { name: "Custom USD", version: "3" });
   });
 
   it("requires network and payTo", () => {
@@ -69,6 +93,30 @@ describe("HttpFacilitator", () => {
     assert.equal(calls.length, 1);
     assert.equal(calls[0].url, "https://facilitator.example/verify"); // trailing slash normalized
     assert.equal(calls[0].body.paymentRequirements.asset, USDC_ADDRESSES["eip155:84532"]);
+    assert.deepEqual(calls[0].body.paymentRequirements.extra, { name: "USDC", version: "2" });
+  });
+
+  it("sends the EIP-712 domain on settle too (real-facilitator contract)", async () => {
+    // Fixture mirrors https://x402.org/facilitator: it rejects a payload whose
+    // requirements lack `extra` with invalid_exact_evm_missing_eip712_domain.
+    const seen: any[] = [];
+    const facilitator = new HttpFacilitator({
+      url: "https://facilitator.example",
+      fetchImpl: stubFetch((_url, body) => {
+        seen.push(body.paymentRequirements);
+        if (!body.paymentRequirements?.extra?.name) {
+          return {
+            success: false,
+            errorReason: "invalid_exact_evm_missing_eip712_domain",
+            errorMessage: "missing eip712 domain",
+          };
+        }
+        return { success: true, transaction: "0xsettled", network: "eip155:84532" };
+      }),
+    });
+    const result = await facilitator.settle({ x402Version: 2 }, REQUIREMENT);
+    assert.deepEqual(result, { outcome: "settled", txHash: "0xsettled" });
+    assert.deepEqual(seen[0].extra, { name: "USDC", version: "2" });
   });
 
   it("verify maps an invalid answer to a reason", async () => {
