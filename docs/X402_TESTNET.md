@@ -86,7 +86,9 @@ against the mock provider catalog with the real rail:
 1. quotes the default service at its minimum quantity (0.2412 USDC),
 2. creates the order and reads its x402 payment requirement,
 3. signs an EIP-3009 `transferWithAuthorization` with `X402_PRIVATE_KEY`
-   (EIP-712 domain `USDC`/`2` on the network's USDC contract),
+   (EIP-712 domain taken from the requirement's `extra`: `USDC`/`2` on Base
+   Sepolia, `USD Coin`/`2` on Base mainnet, against the network's USDC
+   contract),
 4. submits the payload via `core.settlePayment` → facilitator `/verify` →
    `/settle`,
 5. prints the on-chain tx hash and the execution status.
