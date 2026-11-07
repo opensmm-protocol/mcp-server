@@ -81,6 +81,24 @@ interface SettleResponse {
   network?: string;
 }
 
+/**
+ * Facilitator errors carry a machine-readable code (`invalidReason` /
+ * `errorReason`) and a human message. The code is the actionable part —
+ * `invalid_exact_evm_insufficient_balance` says what to fix, while the message
+ * is often a multi-line viem revert. Report code first, then the message
+ * flattened onto one line, so callers and the CLI print a single reason.
+ */
+function describeFacilitatorError(
+  code: string | undefined,
+  message: string | undefined,
+  fallback: string,
+): string {
+  const reason = code?.trim();
+  const detail = message?.replace(/\s+/g, " ").trim();
+  if (reason && detail) return `${reason}: ${detail}`;
+  return reason || detail || fallback;
+}
+
 /** Translate the internal requirement to the facilitator wire shape. */
 export function toWireRequirements(
   requirement: PaymentRequirement,
@@ -166,7 +184,16 @@ export class HttpFacilitator implements X402Facilitator {
       // Surface as a plain error so the intent stays retryable.
       throw new Error(`x402 facilitator ${path} answered HTTP ${response.status}: ${text.slice(0, 300)}`);
     }
-    return JSON.parse(text) as T;
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      // Same class as an HTTP failure: the facilitator answered, but not with
+      // the protocol. Not a payment rejection — the payload may be fine — so
+      // keep it a plain (retryable) domain error instead of a raw SyntaxError.
+      throw new Error(
+        `x402 facilitator ${path} answered invalid JSON (HTTP ${response.status}): ${text.slice(0, 300)}`,
+      );
+    }
   }
 
   async verify(
@@ -180,7 +207,11 @@ export class HttpFacilitator implements X402Facilitator {
     if (result.isValid) return { valid: true };
     return {
       valid: false,
-      reason: result.invalidMessage ?? result.invalidReason ?? "facilitator rejected the payload",
+      reason: describeFacilitatorError(
+        result.invalidReason,
+        result.invalidMessage,
+        "facilitator rejected the payload",
+      ),
     };
   }
 
@@ -198,7 +229,11 @@ export class HttpFacilitator implements X402Facilitator {
       return { outcome: "pending", ...(result.transaction ? { txHash: result.transaction } : {}) };
     }
     throw new PaymentRejectedError(
-      result.errorMessage ?? result.errorReason ?? "facilitator failed to settle",
+      describeFacilitatorError(
+        result.errorReason,
+        result.errorMessage,
+        "facilitator failed to settle",
+      ),
     );
   }
 }

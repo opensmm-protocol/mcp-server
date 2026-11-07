@@ -164,13 +164,22 @@ function curatedCatalogFromEnv(allowExamples: boolean): LoadedCuratedCatalog | u
   return loaded;
 }
 
-export function createDevStack(): DevStack {
+/**
+ * Mock provider stack: local dev/tests, and the "mock provider + real x402"
+ * testnet shape. One constructor so both branches cannot drift apart.
+ */
+function buildMockStack(
+  payments: Pick<CoreOptions, "paymentMethods" | "rails">,
+  curated?: LoadedCuratedCatalog,
+): DevStack {
   const provider = new MockProvider();
-  const catalog = new InMemoryCatalog(mockCatalogEntries, MOCK_CATALOG_VERSION);
+  assertCuratedProviders(curated, [provider.providerId]);
+  const catalog =
+    curated?.catalog ?? new InMemoryCatalog(mockCatalogEntries, MOCK_CATALOG_VERSION);
   const core = new OpenSmmCore({
     catalog,
     providers: [provider],
-    paymentMethods: ["mock"],
+    ...payments,
     ...coreOptionsFromEnv(),
   });
   // The mock stack is for local dev and tests: supervisor exists but is not started.
@@ -179,8 +188,14 @@ export function createDevStack(): DevStack {
     catalog: core.catalog,
     pollActiveOrders: () => core.refreshActiveOrders(),
     runRetentionChecks: () => core.runRetentionChecks(),
+    // A curated catalog is a reviewed snapshot: live sync must not overwrite it.
+    ...(curated ? { syncCatalog: false } : {}),
   });
   return { core, provider, supervisor };
+}
+
+export function createDevStack(): DevStack {
+  return buildMockStack({ paymentMethods: ["mock"] });
 }
 
 export async function createStackFromEnv(
@@ -198,25 +213,9 @@ export async function createStackFromEnv(
       return { ...dev, ...(stateFile ? { stateFile } : {}) };
     }
     // Mock provider + real x402 payments: the testnet settlement shape.
-    const provider = new MockProvider();
-    assertCuratedProviders(curated, [provider.providerId]);
-    const catalog =
-      curated?.catalog ?? new InMemoryCatalog(mockCatalogEntries, MOCK_CATALOG_VERSION);
-    const core = new OpenSmmCore({
-      catalog,
-      providers: [provider],
-      ...payments,
-      ...coreOptionsFromEnv(),
-    });
-    const supervisor = new NodeSupervisor({
-      registry: core.registry,
-      catalog: core.catalog,
-      pollActiveOrders: () => core.refreshActiveOrders(),
-      runRetentionChecks: () => core.runRetentionChecks(),
-      ...(curated ? { syncCatalog: false } : {}),
-    });
-    const stateFile = await attachPersistence(core);
-    return { core, provider, supervisor, ...(stateFile ? { stateFile } : {}) };
+    const stack = buildMockStack(payments, curated);
+    const stateFile = await attachPersistence(stack.core);
+    return { ...stack, ...(stateFile ? { stateFile } : {}) };
   }
 
   const providerId = process.env.OPENSMM_PROVIDER_ID ?? "rest-v1";
