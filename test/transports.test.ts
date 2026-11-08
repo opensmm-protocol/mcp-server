@@ -136,12 +136,13 @@ describe("REST and MCP are one protocol", () => {
     assert.equal(orderMcp2.orderId, orderRest2.body.orderId);
   });
 
-  it("MCP exposes exactly the 10 protocol tools", async () => {
+  it("MCP exposes exactly the 11 protocol tools", async () => {
     const { tools } = await mcpClient.listTools();
     assert.deepEqual(
       tools.map((t) => t.name).sort(),
       [
         "cancel_order",
+        "compare_offers",
         "create_order",
         "get_capabilities",
         "get_order_status",

@@ -119,13 +119,22 @@ MCP (stdio, for Claude Desktop / Kimi Code / Cursor):
 or from a checkout: `"command": "node", "args": ["/path/to/mcp-server/bin/opensmm.mjs"]`.
 
 Tools: `get_capabilities`, `list_providers`, `register_provider`,
-`search_services`, `get_service`, `get_quote`, `create_order`,
+`search_services`, `compare_offers`, `get_service`, `get_quote`, `create_order`,
 `get_order_status`, `cancel_order`, `request_refill`.
 
 `list_providers` (REST: `GET /v0/providers`) returns the pseudonymous provider
 showcase: lifecycle, capabilities, offers count, and gateway-measured quality
 metrics. Providers are listed under opaque keys (`provider-alpha`, …); a
 human-readable `displayName` appears only for providers that opted in.
+
+Choosing between providers for the same service: `search_services` enriches
+every offer with `providerRef` (the pseudonymous provider key) and `quality`
+(gateway-measured `orders`, `deliveredRatio`, `startLatencyMs`), and accepts
+`sort=price|quality|relevance` (`relevance` is the default and keeps the
+catalog order). `compare_offers` (MCP tool) goes one step further: one
+cheapest offer per provider for a `platform`+`objective`, cheapest first,
+with measured quality and the total price for your `quantity` — SUSPENDED
+providers are excluded. `GET /v0/services` supports the same `sort` parameter.
 
 `register_provider` (REST: `POST /v0/providers`) is provider self-onboarding
 (spec/v0 §10): the endpoint URL must pass the SSRF guard, the gateway
