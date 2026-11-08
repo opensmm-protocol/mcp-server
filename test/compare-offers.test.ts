@@ -77,6 +77,18 @@ function createTwoProviderCore(): OpenSmmCore {
   });
 }
 
+/** One provider with two tiers (cheap max 50000, bulk max 200000). */
+function createMultiTierCore(): OpenSmmCore {
+  const catalog = new InMemoryCatalog(
+    [
+      makeEntry("mock", makeService("osmm_svc_tg_members_cheap", "1.000000", { maxQuantity: 50000 }), "1001"),
+      makeEntry("mock", makeService("osmm_svc_tg_members_bulk", "3.000000", { maxQuantity: 200000 }), "1002"),
+    ],
+    "2026-11-08T00:00:00Z",
+  );
+  return new OpenSmmCore({ catalog, providers: [new MockProvider()] });
+}
+
 describe("search_services enrichment", () => {
   it("two providers with one service each → two offers, each with providerRef + quality", () => {
     const core = createTwoProviderCore();
@@ -189,5 +201,24 @@ describe("compare_offers", () => {
     const result = core.compareOffers({ platform: "telegram", objective: "members", quantity: 60000 });
     assert.equal(result.offers.length, 1);
     assert.equal(result.offers[0]!.providerRef, "provider-alpha");
+  });
+
+  it("provider with a pricier covering service is kept (cheapest covering wins)", () => {
+    const core = createMultiTierCore();
+    // 60000 exceeds the cheap service (50000) but the bulk tier covers it.
+    const result = core.compareOffers({ platform: "telegram", objective: "members", quantity: 60000 });
+    assert.equal(result.offers.length, 1);
+    const offer = result.offers[0]!;
+    assert.equal(offer.providerRef, "provider-alpha");
+    assert.equal(offer.serviceId, "osmm_svc_tg_members_bulk");
+    assert.equal(offer.quantityPriced, 60000);
+    assert.equal(offer.total.value, "180.000000");
+  });
+
+  it("provider is dropped when none of its services cover the quantity", () => {
+    const core = createMultiTierCore();
+    // 200001 exceeds every service of the provider.
+    const result = core.compareOffers({ platform: "telegram", objective: "members", quantity: 200001 });
+    assert.equal(result.offers.length, 0);
   });
 });

@@ -418,9 +418,10 @@ export class OpenSmmCore {
   }
 
   /**
-   * Compare offers for a platform+objective across providers: one (cheapest)
-   * offer per provider, cheapest first, with measured quality and the total
-   * price for the requested quantity. SUSPENDED nodes are excluded (§10.1).
+   * Compare offers for a platform+objective across providers: per provider, its
+   * cheapest service that covers the requested quantity, cheapest first, with
+   * measured quality and the total price for the requested quantity. SUSPENDED
+   * nodes are excluded (§10.1).
    */
   compareOffers(input: {
     platform: Service["platform"];
@@ -443,15 +444,22 @@ export class OpenSmmCore {
 
     const offers: OfferComparisonEntry[] = [];
     for (const [providerId, entries] of byProvider) {
-      // One offer per provider: its cheapest service for this platform+objective.
-      const cheapest = entries.reduce((a, b) =>
+      // One offer per provider: its cheapest service for this platform+objective
+      // that covers the requested quantity (without a quantity: the cheapest overall).
+      const eligible =
+        input.quantity !== undefined
+          ? entries.filter(
+              (e) =>
+                input.quantity! >= e.service.minQuantity &&
+                input.quantity! <= e.service.maxQuantity,
+            )
+          : entries;
+      if (eligible.length === 0) continue; // this provider cannot deliver the requested quantity
+      const cheapest = eligible.reduce((a, b) =>
         compareUnitPrice(a.service, b.service) <= 0 ? a : b,
       );
       const service = cheapest.service;
       const quantityPriced = input.quantity ?? service.minQuantity;
-      if (quantityPriced < service.minQuantity || quantityPriced > service.maxQuantity) {
-        continue; // this provider cannot deliver the requested quantity
-      }
       const node = this.registry.get(providerId);
       offers.push({
         providerRef: node?.providerKey ?? providerId,
