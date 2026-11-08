@@ -30,9 +30,9 @@ describe("MCP over Streamable HTTP (remote binding)", () => {
     );
   });
 
-  it("exposes the same 10 tools as stdio", async () => {
+  it("exposes the same 11 tools as stdio", async () => {
     const { tools } = await client.listTools();
-    assert.equal(tools.length, 10);
+    assert.equal(tools.length, 11);
     assert.ok(tools.some((t) => t.name === "register_provider"));
   });
 

@@ -32,6 +32,7 @@ before ordering and is consumed exactly once.
 - listProviders — GET /v0/providers / list_providers
 - registerProvider — POST /v0/providers / register_provider
 - searchServices — GET /v0/services / search_services
+- compareOffers — MCP tool compare_offers (gateway extension)
 - getService — GET /v0/services/{id} / get_service
 - getQuote — POST /v0/quotes / get_quote
 - createOrder — POST /v0/orders / create_order
@@ -45,6 +46,16 @@ GET /v0/providers lists pseudonymous nodes (providerKey, lifecycle,
 capabilities, offersCount, gateway-measured metrics). Metrics are measured
 by the gateway from real orders, never self-reported. Quality tiers are
 derived with the open formula in spec/v0 §9.1 — recompute them yourself.
+
+Every search_services offer carries providerRef (the providerKey of the node
+serving it) and quality (measured orders, deliveredRatio, startLatencyMs;
+ratio/latency appear only with sufficient sample). sort=price orders by
+normalized unit price, sort=quality by measured quality, sort=relevance (the
+default) keeps the catalog order; GET /v0/services accepts the same sort
+parameter. compare_offers (platform + objective [+ quantity]) returns one
+cheapest offer per provider, cheapest first, each with its measured quality
+and the total price for your quantity — the direct answer to «who is cheaper
+and who is more reliable for this». SUSPENDED providers never appear.
 
 ## Docs
 

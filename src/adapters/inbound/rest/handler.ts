@@ -10,6 +10,7 @@ import { OpenSmmError, toErrorBody } from "../../../core/errors.ts";
 
 const PLATFORM_VALUES = ["telegram", "instagram", "youtube", "tiktok", "x", "vk", "other"] as const;
 const OBJECTIVE_VALUES = ["followers", "members", "likes", "views", "reactions", "comments", "other"] as const;
+const SORT_VALUES = ["price", "quality", "relevance"] as const;
 
 const createQuoteSchema = z.object({
   serviceId: z.string().regex(/^osmm_svc_/),
@@ -116,10 +117,15 @@ export function createRestHandler(
         if (objective && !OBJECTIVE_VALUES.includes(objective as (typeof OBJECTIVE_VALUES)[number])) {
           throw new OpenSmmError("VALIDATION_FAILED", `unknown objective: ${objective}`);
         }
+        const sort = url.searchParams.get("sort") ?? undefined;
+        if (sort && !SORT_VALUES.includes(sort as (typeof SORT_VALUES)[number])) {
+          throw new OpenSmmError("VALIDATION_FAILED", `unknown sort: ${sort}`);
+        }
         const result = core.searchServices({
           query: url.searchParams.get("query") ?? undefined,
           platform: platform as (typeof PLATFORM_VALUES)[number] | undefined,
           objective: objective as (typeof OBJECTIVE_VALUES)[number] | undefined,
+          sort: sort as (typeof SORT_VALUES)[number] | undefined,
         });
         sendJson(res, 200, result);
         return;
