@@ -72,8 +72,13 @@ The image is published to the GitHub Container Registry on every merge to
 checkout, no keys:
 
 ```bash
-docker run -d --name opensmm -p 8080:8080 -v opensmm-data:/data \
-  ghcr.io/opensmm-protocol/gateway:latest
+docker run -p 8080:8080 -v opensmm-data:/data ghcr.io/opensmm-protocol/gateway
+```
+
+Add `-d --name opensmm` to run it in the background:
+
+```bash
+docker run -d --name opensmm -p 8080:8080 -v opensmm-data:/data ghcr.io/opensmm-protocol/gateway
 ```
 
 The node starts on the mock catalog and answers on
