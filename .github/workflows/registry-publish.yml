@@ -1,0 +1,90 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  npm:
+    name: Publish npm package
+    runs-on: ubuntu-latest
+    outputs:
+      published: ${{ steps.token.outputs.published }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check for NPM_TOKEN
+        id: token
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "${NPM_TOKEN}" ]; then
+            echo "::notice title=npm publish skipped::NPM_TOKEN is not configured; skipping npm publish instead of failing the run."
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish to npm
+        if: steps.token.outputs.published == 'true'
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  registry:
+    name: Publish to the MCP Registry
+    needs: npm
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check npm publish result
+        id: gate
+        env:
+          NPM_PUBLISHED: ${{ needs.npm.outputs.published }}
+        run: |
+          if [ "${NPM_PUBLISHED}" = "true" ]; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice title=MCP Registry publish skipped::npm publish did not run, so the registry entry would point to a version that does not exist."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check out repository
+        if: steps.gate.outputs.publish == 'true'
+        uses: actions/checkout@v4
+
+      - name: Install mcp-publisher
+        if: steps.gate.outputs.publish == 'true'
+        run: |
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/').tar.gz" | tar -xz mcp-publisher
+          ./mcp-publisher --version
+
+      - name: Log in with GitHub OIDC
+        if: steps.gate.outputs.publish == 'true'
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish server.json
+        if: steps.gate.outputs.publish == 'true'
+        run: ./mcp-publisher publish

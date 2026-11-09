@@ -1,0 +1,4 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.opensmm-protocol/mcp-server",
+  "description": "This file is not valid JSON and must be rejected before schema validation.",

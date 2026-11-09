@@ -1,0 +1,23 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.opensmm-protocol/mcp-server",
+  "title": "OpenSMM — SMM MCP server for social media growth",
+  "description": "SMM MCP server: social media growth, Instagram growth, Telegram views, follower purchase.",
+  "version": "0.1.0",
+  "websiteUrl": "https://opensmm.dev",
+  "repository": {
+    "url": "https://github.com/opensmm-protocol/mcp-server",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@opensmm/mcp-server",
+      "version": "0.1.0",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}

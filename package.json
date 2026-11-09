@@ -59,6 +59,7 @@
     "x402:testnet": "node --env-file-if-exists=.env scripts/x402-testnet-run.ts",
     "manifests:sync": "node scripts/sync-manifests.mjs",
     "manifests:check": "node scripts/sync-manifests.mjs --check",
+    "validate:manifest": "node scripts/validate-server-manifest.mjs",
     "prepack": "npm run build",
     "prepublishOnly": "npm run manifests:check && npm run typecheck && npm test"
   },
