@@ -43,6 +43,7 @@
     "llms.txt",
     "server.json",
     "README.md",
+    ".env.example",
     "LICENSE"
   ],
   "bin": {

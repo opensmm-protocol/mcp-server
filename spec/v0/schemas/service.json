@@ -41,6 +41,10 @@
       "description": "Pseudonymous provider key (spec/v0 §9). Gateway enrichment on search results; absent on catalog snapshots that predate it.",
       "pattern": "^provider-"
     },
+    "synthetic": {
+      "type": "boolean",
+      "description": "True when the offer comes from the built-in mock provider: fixtures for local development, not sellable supply. Absent on real provider offers."
+    },
     "quality": {
       "type": "object",
       "description": "Gateway-measured quality of the provider behind this offer (spec/v0 §9); never provider self-reported.",

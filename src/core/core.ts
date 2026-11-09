@@ -297,6 +297,7 @@ export class OpenSmmCore {
         providerKey: node.providerKey,
         ...(node.publiclyListed && node.displayName ? { displayName: node.displayName } : {}),
         lifecycle: node.lifecycle,
+        ...(node.provider.synthetic ? { synthetic: true } : {}),
         capabilities: caps,
         offersCount: this.catalog
           .list()
@@ -495,6 +496,7 @@ export class OpenSmmCore {
     return {
       ...entry.service,
       providerRef: node?.providerKey ?? entry.providerId,
+      ...(node?.provider.synthetic ? { synthetic: true } : {}),
       quality: this.qualityFor(entry.service, entry.providerId),
     };
   }
