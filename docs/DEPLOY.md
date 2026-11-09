@@ -5,6 +5,66 @@ One process serves both bindings: REST `/v0` and MCP `/mcp` on one port
 single JSON snapshot file — mount it on a volume and the gateway survives
 restarts and redeploys.
 
+## Run a node in 5 minutes
+
+One command starts a complete node: REST `/v0` and MCP `/mcp` on one port,
+on the built-in mock catalog. No keys, no external services, no code
+changes. Requires Node.js ≥ 22.18.
+
+```bash
+npx -y @opensmm/mcp-server gateway --port 8080
+```
+
+If the published package does not contain the `gateway` command yet (npm
+publication is tracked in ZHC-287), run the same command from a checkout:
+
+```bash
+npm ci && npm run build && node bin/opensmm.mjs gateway --port 8080
+```
+
+The node reports its port on stderr:
+
+```
+OpenSMM 0.1.0 gateway listening on http://localhost:8080 (REST /v0, MCP /mcp; provider: mock, mock catalog — not real supply)
+```
+
+Check the node:
+
+```bash
+curl -s http://localhost:8080/v0/capabilities   # protocol version, commands
+curl -s http://localhost:8080/v0/services       # served catalog
+curl -s http://localhost:8080/v0/providers      # provider nodes and metrics
+```
+
+What you see after the start:
+
+- The catalog is the **mock catalog**. Every service has `"synthetic": true`
+  and `providerRef: "provider-alpha"`. Mock services are fixtures for local
+  development: they are not sellable supply and no real order is placed. The
+  live catalog is empty until you connect a provider (see README,
+  «Connecting a live provider (rest-v1)»).
+- `GET /v0/providers` lists one node, `provider-alpha`, with `synthetic: true`,
+  its `lifecycle`, `offersCount` and gateway-measured `metrics`. `metrics`
+  shows `sampleSize: 0` until the node executes orders; measured fields
+  appear only when the sample justifies them (spec/v0 §9).
+- A provider node that you register yourself starts at lifecycle
+  `UNVERIFIED`: it runs in sandbox, its orders are volume-capped per order
+  until measured quality promotes it to `ACTIVE` (spec/v0 §10.1).
+- MCP clients connect to `http://localhost:8080/mcp` (Streamable HTTP,
+  stateless, open CORS). `tools/list` returns 11 tools.
+
+Keep the state across restarts with a snapshot file:
+
+```bash
+npx -y @opensmm/mcp-server gateway --port 8080 --state ./opensmm-state.json
+```
+
+`--port` and `--state` override the `PORT` and `OPENSMM_STATE_FILE`
+variables; `--help` lists the flags. Every variable is commented in
+`.env.example`. To publish the node to agents, put TLS in front (section
+«TLS + public endpoint (Caddy)» below) and set `OPENSMM_PROVIDER_PAYOUT`,
+so that the orders of this node carry your payout address.
+
 ## Docker (recommended)
 
 ```bash

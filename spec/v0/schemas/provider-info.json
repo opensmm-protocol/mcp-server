@@ -20,6 +20,10 @@
       "enum": ["UNVERIFIED", "ACTIVE", "SUSPENDED"],
       "description": "Node lifecycle state (§10). UNVERIFIED nodes are in sandbox; SUSPENDED nodes are excluded from routing."
     },
+    "synthetic": {
+      "type": "boolean",
+      "description": "True for the built-in mock provider: its offers are fixtures, not sellable supply. Absent on real provider nodes."
+    },
     "capabilities": {
       "type": "object",
       "required": ["cancel", "refill", "batchStatus"],

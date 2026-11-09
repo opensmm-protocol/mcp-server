@@ -41,6 +41,7 @@ export interface MockProviderOptions {
 
 export class MockProvider implements OpenSmmProvider {
   readonly providerId = "mock";
+  readonly synthetic = true;
 
   private readonly startAfterPolls: number;
   private readonly completeAfterPolls: number;

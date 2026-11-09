@@ -4,6 +4,7 @@ dist/
 .DS_Store
 .env
 .env.*
+!.env.example
 data/*
 !data/curated-services.json
 

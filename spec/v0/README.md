@@ -188,6 +188,10 @@ exposed through the protocol.
   self-reports. A metric field is omitted until `sampleSize` justifies it;
   `sampleSize` is always shown so agents can judge confidence. Publishing
   `successRate: 100` by default is forbidden.
+- `synthetic: true` marks the gateway's built-in mock provider: its offers are
+  fixtures for local development. The flag is absent on real provider nodes and
+  on their services, so an agent can always tell a demo catalog from sellable
+  supply.
 
 ### 9.1 Quality tiers (computed, open formula)
 

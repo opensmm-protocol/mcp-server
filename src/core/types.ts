@@ -70,6 +70,8 @@ export interface Service {
   status: "ACTIVE" | "DISABLED";
   /** Gateway enrichment (search results): pseudonymous provider key. */
   providerRef?: string;
+  /** Gateway enrichment: true when the offer comes from the built-in mock provider (fixtures, not sellable supply). */
+  synthetic?: boolean;
   /** Gateway enrichment (search results): measured quality of the provider. */
   quality?: OfferQuality;
 }
@@ -208,6 +210,8 @@ export interface ProviderInfo {
   providerKey: string;
   displayName?: string;
   lifecycle: NodeLifecycle;
+  /** True for the built-in mock provider: its offers are fixtures, not sellable supply. */
+  synthetic?: boolean;
   capabilities: { cancel: boolean; refill: boolean; batchStatus: boolean };
   offersCount: number;
   metrics: ProviderMetrics;

@@ -85,6 +85,13 @@ export class SubmissionAmbiguousError extends Error {
 export interface OpenSmmProvider {
   readonly providerId: string;
 
+  /**
+   * True for the built-in MockProvider: its offers are fixtures, not sellable
+   * supply. The gateway publishes that fact as `synthetic` on every service
+   * and provider view so a buyer cannot mistake mock data for a real catalog.
+   */
+  readonly synthetic?: boolean;
+
   getCapabilities(): Promise<ProviderCapabilities>;
 
   listOffers(): Promise<ProviderOffer[]>;

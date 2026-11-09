@@ -112,6 +112,11 @@ npm run gateway     # http://localhost:8080 — both bindings in one process (de
 
 Production deployment (Docker, TLS, state persistence): [`docs/DEPLOY.md`](./docs/DEPLOY.md).
 
+## Run a node in 5 minutes
+
+`npx -y @opensmm/mcp-server gateway --port 8080` starts a complete node — REST `/v0` and MCP `/mcp` on one port, no keys — on the mock catalog (`"synthetic": true`, not real supply).
+One command, what you see after, state file and flags: [`docs/DEPLOY.md` → Run a node in 5 minutes](./docs/DEPLOY.md#run-a-node-in-5-minutes).
+
 ## Connecting a live provider (rest-v1)
 
 Both entry points boot against the MockProvider by default. To run the gateway
