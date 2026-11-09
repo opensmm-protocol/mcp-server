@@ -128,6 +128,9 @@ describe("node supervision (spec §10.4)", () => {
     const provider = new FlakyProvider();
     const catalog = new InMemoryCatalog(
       provider.offers.map((o) => providerOfferToCatalogEntry(o, "flaky")),
+      // Fixed seed: the default `new Date().toISOString()` can equal the
+      // version written by an immediate sync on a fast runner.
+      "catalog-v0",
     );
     const core = new OpenSmmCore({ catalog, providers: [provider], paymentMethods: ["mock"] });
     const supervisor = new NodeSupervisor({
