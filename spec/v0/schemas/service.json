@@ -36,6 +36,27 @@
     "minQuantity": { "type": "integer", "minimum": 1 },
     "maxQuantity": { "type": "integer", "minimum": 1 },
     "qualityTier": { "type": "string", "enum": ["economy", "standard", "premium"] },
+    "providerRef": {
+      "type": "string",
+      "description": "Pseudonymous provider key (spec/v0 §9). Gateway enrichment on search results; absent on catalog snapshots that predate it.",
+      "pattern": "^provider-"
+    },
+    "synthetic": {
+      "type": "boolean",
+      "description": "True when the offer comes from the built-in mock provider: fixtures for local development, not sellable supply. Absent on real provider offers."
+    },
+    "quality": {
+      "type": "object",
+      "description": "Gateway-measured quality of the provider behind this offer (spec/v0 §9); never provider self-reported.",
+      "required": ["orders"],
+      "additionalProperties": false,
+      "properties": {
+        "tier": { "type": "string", "enum": ["economy", "standard", "premium"] },
+        "orders": { "type": "integer", "minimum": 0 },
+        "deliveredRatio": { "type": "number", "minimum": 0, "maximum": 1 },
+        "startLatencyMs": { "type": "number", "minimum": 0 }
+      }
+    },
     "parameters": {
       "type": "array",
       "description": "Extra order parameters beyond link+quantity (e.g. custom comments). link is always required and is not listed here.",

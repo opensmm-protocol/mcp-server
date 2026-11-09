@@ -37,6 +37,22 @@ export interface ServiceParameter {
   description?: string;
 }
 
+/**
+ * Gateway-measured quality of the provider behind an offer. Numbers come from
+ * the gateway's own orders (spec/v0 §9), never from provider self-reports;
+ * ratio/latency fields are omitted until the sample supports them.
+ */
+export interface OfferQuality {
+  /** Advertised tier of the underlying service (economy/standard/premium). */
+  tier?: "economy" | "standard" | "premium";
+  /** Completed terminal observations (orders) behind the measurements. */
+  orders: number;
+  /** Delivered units / ordered units. */
+  deliveredRatio?: number;
+  /** Median milliseconds from payment to first delivery observation. */
+  startLatencyMs?: number;
+}
+
 export interface Service {
   serviceId: string;
   name: string;
@@ -52,6 +68,12 @@ export interface Service {
   parameters: ServiceParameter[];
   capabilities: { refill: boolean; cancel: boolean; dripfeed: boolean };
   status: "ACTIVE" | "DISABLED";
+  /** Gateway enrichment (search results): pseudonymous provider key. */
+  providerRef?: string;
+  /** Gateway enrichment: true when the offer comes from the built-in mock provider (fixtures, not sellable supply). */
+  synthetic?: boolean;
+  /** Gateway enrichment (search results): measured quality of the provider. */
+  quality?: OfferQuality;
 }
 
 export interface Quote {
@@ -188,6 +210,8 @@ export interface ProviderInfo {
   providerKey: string;
   displayName?: string;
   lifecycle: NodeLifecycle;
+  /** True for the built-in mock provider: its offers are fixtures, not sellable supply. */
+  synthetic?: boolean;
   capabilities: { cancel: boolean; refill: boolean; batchStatus: boolean };
   offersCount: number;
   metrics: ProviderMetrics;
@@ -216,10 +240,41 @@ export interface CreateOrderInput {
   clientReference: string;
 }
 
+export type ServiceSort = "price" | "quality" | "relevance";
+
 export interface SearchServicesQuery {
   query?: string;
   platform?: Platform;
   objective?: Objective;
+  /** Result order; "relevance" is the catalog order (default, unchanged behavior). */
+  sort?: ServiceSort;
+}
+
+/** One provider's offer inside a compare_offers result. */
+export interface OfferComparisonEntry {
+  /** Pseudonymous provider key (spec/v0 §9). */
+  providerRef: string;
+  serviceId: string;
+  serviceName: string;
+  rate: Money;
+  rateBasis: RateBasis;
+  minQuantity: number;
+  maxQuantity: number;
+  /** The quantity the total was priced for (the request quantity, else the service minimum). */
+  quantityPriced: number;
+  /** Total price for quantityPriced. */
+  total: Money;
+  quality: OfferQuality;
+}
+
+/** Output of compareOffers: one cheapest offer per provider, cheapest first. */
+export interface OfferComparison {
+  platform: Platform;
+  objective: Objective;
+  /** The requested quantity, when one was given. */
+  quantity?: number;
+  offers: OfferComparisonEntry[];
+  catalogVersion: string;
 }
 
 export interface RefillResult {

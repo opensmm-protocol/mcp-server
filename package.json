@@ -1,11 +1,12 @@
 {
   "name": "@opensmm/mcp-server",
   "version": "0.1.0",
+  "mcpName": "io.github.opensmm-protocol/mcp-server",
   "description": "OpenSMM Protocol — open MCP server and REST gateway for ordering social media growth services (SMM) via AI agents. Provider-neutral, idempotent, x402/USDC-Base direct settlement.",
   "license": "MIT",
   "type": "module",
   "engines": {
-    "node": ">=22.6"
+    "node": ">=22.18"
   },
   "keywords": [
     "mcp",
@@ -35,18 +36,22 @@
     "access": "public"
   },
   "files": [
+    "bin",
+    "dist",
     "src",
     "spec",
     "docs",
     "llms.txt",
-    "mcp.json",
+    "server.json",
     "README.md",
+    ".env.example",
     "LICENSE"
   ],
   "bin": {
     "opensmm": "./bin/opensmm.mjs"
   },
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "node --test \"test/**/*.test.ts\"",
     "rest": "node --env-file-if-exists=.env src/adapters/inbound/rest/server.ts",
@@ -54,7 +59,11 @@
     "mcp:http": "node --env-file-if-exists=.env src/adapters/inbound/mcp/http.ts",
     "gateway": "node --env-file-if-exists=.env src/adapters/inbound/gateway.ts",
     "x402:testnet": "node --env-file-if-exists=.env scripts/x402-testnet-run.ts",
-    "prepublishOnly": "npm run typecheck && npm test"
+    "manifests:sync": "node scripts/sync-manifests.mjs",
+    "manifests:check": "node scripts/sync-manifests.mjs --check",
+    "validate:manifest": "node scripts/validate-server-manifest.mjs",
+    "prepack": "npm run build",
+    "prepublishOnly": "npm run manifests:check && npm run typecheck && npm test"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",

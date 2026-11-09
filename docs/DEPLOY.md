@@ -5,20 +5,121 @@ One process serves both bindings: REST `/v0` and MCP `/mcp` on one port
 single JSON snapshot file — mount it on a volume and the gateway survives
 restarts and redeploys.
 
-## Docker (recommended)
+## Run a node in 5 minutes
+
+One command starts a complete node: REST `/v0` and MCP `/mcp` on one port,
+on the built-in mock catalog. No keys, no external services, no code
+changes. Requires Node.js ≥ 22.18.
 
 ```bash
-docker build -t opensmm-gateway .
-docker run -d --name opensmm \
-  -p 127.0.0.1:8080:8080 \
-  -v opensmm-data:/data \
+npx -y @opensmm/mcp-server gateway --port 8080
+```
+
+If the published package does not contain the `gateway` command yet (npm
+publication is tracked in ZHC-287), run the same command from a checkout:
+
+```bash
+npm ci && npm run build && node bin/opensmm.mjs gateway --port 8080
+```
+
+The node reports its port on stderr:
+
+```
+OpenSMM 0.1.0 gateway listening on http://localhost:8080 (REST /v0, MCP /mcp; provider: mock, mock catalog — not real supply)
+```
+
+Check the node:
+
+```bash
+curl -s http://localhost:8080/v0/capabilities   # protocol version, commands
+curl -s http://localhost:8080/v0/services       # served catalog
+curl -s http://localhost:8080/v0/providers      # provider nodes and metrics
+```
+
+What you see after the start:
+
+- The catalog is the **mock catalog**. Every service has `"synthetic": true`
+  and `providerRef: "provider-alpha"`. Mock services are fixtures for local
+  development: they are not sellable supply and no real order is placed. The
+  live catalog is empty until you connect a provider (see README,
+  «Connecting a live provider (rest-v1)»).
+- `GET /v0/providers` lists one node, `provider-alpha`, with `synthetic: true`,
+  its `lifecycle`, `offersCount` and gateway-measured `metrics`. `metrics`
+  shows `sampleSize: 0` until the node executes orders; measured fields
+  appear only when the sample justifies them (spec/v0 §9).
+- A provider node that you register yourself starts at lifecycle
+  `UNVERIFIED`: it runs in sandbox, its orders are volume-capped per order
+  until measured quality promotes it to `ACTIVE` (spec/v0 §10.1).
+- MCP clients connect to `http://localhost:8080/mcp` (Streamable HTTP,
+  stateless, open CORS). `tools/list` returns 11 tools.
+
+Keep the state across restarts with a snapshot file:
+
+```bash
+npx -y @opensmm/mcp-server gateway --port 8080 --state ./opensmm-state.json
+```
+
+`--port` and `--state` override the `PORT` and `OPENSMM_STATE_FILE`
+variables; `--help` lists the flags. Every variable is commented in
+`.env.example`. To publish the node to agents, put TLS in front (section
+«TLS + public endpoint (Caddy)» below) and set `OPENSMM_PROVIDER_PAYOUT`,
+so that the orders of this node carry your payout address.
+
+## Docker (recommended)
+
+The image is published to the GitHub Container Registry on every merge to
+`main` and on `v*` tags (`.github/workflows/publish.yml`). No build, no
+checkout, no keys:
+
+```bash
+docker run -p 127.0.0.1:8080:8080 -v opensmm-data:/data ghcr.io/opensmm-protocol/gateway
+```
+
+The port binds to loopback only: the node has no TLS and no authentication
+of its own, so it must not listen on a public interface. Put Caddy in front
+for a public node (section «TLS + public endpoint (Caddy)»).
+
+Add `-d --name opensmm` to run it in the background:
+
+```bash
+docker run -d --name opensmm -p 127.0.0.1:8080:8080 -v opensmm-data:/data ghcr.io/opensmm-protocol/gateway
+```
+
+The node starts on the mock catalog and answers on
+`http://localhost:8080` (`/v0/services`, `/v0/providers`, `/mcp`) within a
+few seconds. Add a live provider and your payout address with `-e`:
+
+```bash
+docker run -d --name opensmm -p 127.0.0.1:8080:8080 -v opensmm-data:/data \
   -e OPENSMM_REST_V1_BASE_URL=https://provider.example/api/v1 \
   -e OPENSMM_REST_V1_API_KEY=your-reseller-key \
   -e OPENSMM_PROVIDER_PAYOUT=0xYourUsdcBaseAddress \
-  opensmm-gateway
+  ghcr.io/opensmm-protocol/gateway:latest
 ```
 
 or `docker compose up -d` (see `docker-compose.yml`).
+
+A node with a live provider that other people can reach must also set the
+payment rail: `-e X402_FACILITATOR_URL=https://x402.org/facilitator -e
+X402_PAYTO_ADDRESS=0xYourUsdcBaseAddress`. Without `X402_FACILITATOR_URL`
+the gateway keeps the dev-only mock rail, which settles orders without any
+payment — every order then spends the operator's provider balance for free.
+
+Image tags: `latest` (default branch), `X.Y.Z` and `X.Y` (on a `vX.Y.Z`
+tag), `sha-<commit>` for every build. The image is `linux/amd64`. The
+package is public, so `docker pull` needs no credentials; the publish
+workflow fails if an anonymous pull does not work. The image is built from
+this repository's `Dockerfile`; `scripts/smoke-container.sh` runs a
+container end to end (catalog, MCP `initialize`, `tools/list`, order
+idempotency, providers). CI repeats the same smoke test on every pull
+request.
+
+To test local changes instead of the published image, build it yourself —
+development only:
+
+```bash
+docker build -t opensmm-gateway . && docker run -d -p 127.0.0.1:8080:8080 -v opensmm-data:/data opensmm-gateway
+```
 
 The state file (`/data/opensmm-state.json`) contains provider credentials —
 it is written with mode `0600`; back it up like a secret.
@@ -36,6 +137,11 @@ mcp.opensmm.dev {
 Caddy issues and renews the certificate automatically. Agents then connect
 to `https://mcp.opensmm.dev/mcp` (Streamable HTTP, stateless, CORS-open);
 REST is available on the same host under `/v0`.
+
+How agents discover OpenSMM (npm package, MCP Registry entry, weekly download
+metric) is documented in [`REGISTRY.md`](./REGISTRY.md). A gateway an operator
+deploys like this is not published to the registry: the public entry stays
+package-only.
 
 ## Environment
 

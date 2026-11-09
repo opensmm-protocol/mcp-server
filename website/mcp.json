@@ -1,25 +1,23 @@
 {
-  "$schema": "https://modelcontextprotocol.io/schema/server.json",
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.opensmm-protocol/mcp-server",
+  "title": "OpenSMM — SMM MCP server for social media growth",
+  "description": "SMM MCP server: social media growth, Instagram growth, Telegram views, follower purchase.",
   "version": "0.1.0",
-  "description": "OpenSMM Protocol — open MCP server and REST gateway for ordering social media growth services (SMM) via AI agents. Provider-neutral catalog and quotes, idempotent orders, pseudonymous provider showcase with measured quality, x402/USDC-Base direct settlement.",
-  "homepage": "https://opensmm.dev",
-  "repository": "https://github.com/opensmm-protocol/mcp-server",
-  "license": "MIT",
-  "transport": {
-    "type": "stdio"
+  "websiteUrl": "https://opensmm.dev",
+  "repository": {
+    "url": "https://github.com/opensmm-protocol/mcp-server",
+    "source": "github"
   },
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@opensmm/mcp-server",
       "version": "0.1.0",
+      "runtimeHint": "npx",
       "transport": {
         "type": "stdio"
       }
     }
-  ],
-  "capabilities": {
-    "tools": true
-  }
+  ]
 }

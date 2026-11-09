@@ -119,7 +119,7 @@ describe("HttpFacilitator", () => {
     assert.deepEqual(seen[0].extra, { name: "USDC", version: "2" });
   });
 
-  it("verify maps an invalid answer to a reason", async () => {
+  it("verify maps an invalid answer to a reason, code first", async () => {
     const facilitator = new HttpFacilitator({
       url: "https://facilitator.example",
       fetchImpl: stubFetch(() => ({
@@ -130,7 +130,20 @@ describe("HttpFacilitator", () => {
     });
     const result = await facilitator.verify({}, REQUIREMENT);
     assert.equal(result.valid, false);
-    assert.equal(result.reason, "signature must be a string");
+    assert.equal(result.reason, "invalid_exact_evm_payload: signature must be a string");
+  });
+
+  it("verify keeps the message when the facilitator sends no code", async () => {
+    const facilitator = new HttpFacilitator({
+      url: "https://facilitator.example",
+      fetchImpl: stubFetch(() => ({
+        isValid: false,
+        invalidMessage: "payload expired",
+      })),
+    });
+    const result = await facilitator.verify({}, REQUIREMENT);
+    assert.equal(result.valid, false);
+    assert.equal(result.reason, "payload expired");
   });
 
   it("settle returns settled with the on-chain tx hash", async () => {
@@ -160,20 +173,75 @@ describe("HttpFacilitator", () => {
     assert.deepEqual(result, { outcome: "pending", txHash: "0xpendingtx" });
   });
 
-  it("settle throws PaymentRejectedError on a definitive failure", async () => {
+  it("settle throws PaymentRejectedError on a definitive failure, code first on one line", async () => {
+    // Public facilitator shape (x402.org): both the code and a multi-line
+    // viem revert. The CLI prints err.message, so the code must lead and the
+    // detail must not spread over several lines.
     const facilitator = new HttpFacilitator({
       url: "https://facilitator.example",
       fetchImpl: stubFetch(() => ({
         success: false,
-        errorReason: "insufficient_funds",
-        errorMessage: "payer balance too low",
+        errorReason: "invalid_exact_evm_insufficient_balance",
+        errorMessage:
+          "Error: revert\n\nDetails: balance 0 < required 2412000\nVersion: viem@2.57.16",
         transaction: "",
         network: "eip155:84532",
       })),
     });
     await assert.rejects(
       () => facilitator.settle({}, REQUIREMENT),
-      (err: unknown) => err instanceof PaymentRejectedError && /balance too low/.test(err.message),
+      (err: unknown) => {
+        assert.ok(err instanceof PaymentRejectedError);
+        assert.match(err.message, /^invalid_exact_evm_insufficient_balance: /);
+        assert.match(err.message, /balance 0 < required 2412000/);
+        assert.ok(!err.message.includes("\n"), "error must be a single line");
+        return true;
+      },
+    );
+  });
+
+  it("settle keeps the message when the facilitator sends no code", async () => {
+    const facilitator = new HttpFacilitator({
+      url: "https://facilitator.example",
+      fetchImpl: stubFetch(() => ({
+        success: false,
+        errorMessage: "payer balance too low",
+        network: "eip155:84532",
+      })),
+    });
+    await assert.rejects(
+      () => facilitator.settle({}, REQUIREMENT),
+      (err: unknown) =>
+        err instanceof PaymentRejectedError && err.message === "payer balance too low",
+    );
+  });
+
+  it("settle falls back to a non-empty reason when the answer has neither code nor message", async () => {
+    const facilitator = new HttpFacilitator({
+      url: "https://facilitator.example",
+      fetchImpl: stubFetch(() => ({ success: false })),
+    });
+    await assert.rejects(
+      () => facilitator.settle({}, REQUIREMENT),
+      (err: unknown) =>
+        err instanceof PaymentRejectedError && err.message === "facilitator failed to settle",
+    );
+  });
+
+  it("a 200 with a non-JSON body is a plain facilitator error, not a raw SyntaxError", async () => {
+    const facilitator = new HttpFacilitator({
+      url: "https://facilitator.example",
+      // Proxy / captive-portal style answer: HTTP 200, HTML body.
+      fetchImpl: (async () => new Response("<html>bad gateway</html>", { status: 200 })) as typeof fetch,
+    });
+    await assert.rejects(
+      () => facilitator.settle({}, REQUIREMENT),
+      (err: unknown) =>
+        err instanceof Error &&
+        !(err instanceof SyntaxError) &&
+        // Still retryable: the facilitator broke, the payment was not rejected.
+        !(err instanceof PaymentRejectedError) &&
+        /x402 facilitator \/settle answered invalid JSON/.test(err.message),
     );
   });
 

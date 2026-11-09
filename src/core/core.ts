@@ -9,7 +9,7 @@ import { providerOfferToCatalogEntry } from "./catalog-map.ts";
 import { OpenSmmError } from "./errors.ts";
 import { newId, nowIso } from "./ids.ts";
 import { MetricsRecorder, type MetricsState } from "./metrics.ts";
-import { quoteAmount } from "./money.ts";
+import { parseDecimal, quoteAmount } from "./money.ts";
 import { PaymentRejectedError, type PaymentRail } from "./payment-rail.ts";
 import { ProviderRegistry, type ProviderNode } from "./provider-registry.ts";
 import {
@@ -27,6 +27,9 @@ import type {
   CreateQuoteInput,
   Money,
   NodeLifecycle,
+  OfferComparison,
+  OfferComparisonEntry,
+  OfferQuality,
   Order,
   PaymentIntent,
   PaymentMethod,
@@ -39,6 +42,7 @@ import type {
   RegisterProviderResult,
   SearchServicesQuery,
   Service,
+  ServiceSort,
 } from "./types.ts";
 
 const PROTOCOL_VERSION = "0.1.0" as const;
@@ -66,6 +70,31 @@ export type ProviderFactory = (
 ) => Promise<{ provider: OpenSmmProvider; offers: ProviderOffer[] }>;
 
 const TERMINAL_EXECUTION = new Set(["COMPLETED", "CANCELED", "ERROR"]);
+
+/**
+ * Compares normalized unit prices across rate bases without floats:
+ * PER_1000 rates are scaled down by 1000 via cross-multiplication.
+ */
+function compareUnitPrice(
+  a: Pick<Service, "rate" | "rateBasis">,
+  b: Pick<Service, "rate" | "rateBasis">,
+): number {
+  const divisor = (basis: Service["rateBasis"]) => (basis === "PER_1000" ? 1000n : 1n);
+  const left = parseDecimal(a.rate.value) * divisor(b.rateBasis);
+  const right = parseDecimal(b.rate.value) * divisor(a.rateBasis);
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
+/** Quality order for sorting: better (higher ratio, lower latency, more orders) first. */
+function compareQuality(a?: OfferQuality, b?: OfferQuality): number {
+  const ratioDiff = (b?.deliveredRatio ?? -1) - (a?.deliveredRatio ?? -1);
+  if (ratioDiff !== 0) return ratioDiff;
+  const latencyDiff =
+    (a?.startLatencyMs ?? Number.POSITIVE_INFINITY) -
+    (b?.startLatencyMs ?? Number.POSITIVE_INFINITY);
+  if (latencyDiff !== 0) return latencyDiff;
+  return (b?.orders ?? 0) - (a?.orders ?? 0);
+}
 
 export interface QuoteRecord {
   quote: Quote;
@@ -268,6 +297,7 @@ export class OpenSmmCore {
         providerKey: node.providerKey,
         ...(node.publiclyListed && node.displayName ? { displayName: node.displayName } : {}),
         lifecycle: node.lifecycle,
+        ...(node.provider.synthetic ? { synthetic: true } : {}),
         capabilities: caps,
         offersCount: this.catalog
           .list()
@@ -367,19 +397,120 @@ export class OpenSmmCore {
       .list()
       // SUSPENDED nodes are excluded from routing and search (spec/v0 §10.1).
       .filter((e) => this.registry.get(e.providerId)?.lifecycle !== "SUSPENDED")
-      .map((e) => e.service)
-      .filter((s) => s.status === "ACTIVE")
-      .filter((s) => (query.platform ? s.platform === query.platform : true))
-      .filter((s) => (query.objective ? s.objective === query.objective : true))
-      .filter((s) =>
+      .filter((e) => e.service.status === "ACTIVE")
+      .filter((e) => (query.platform ? e.service.platform === query.platform : true))
+      .filter((e) => (query.objective ? e.service.objective === query.objective : true))
+      .filter((e) =>
         text
-          ? [s.name, s.description ?? "", s.category ?? "", s.platform, s.objective]
+          ? [e.service.name, e.service.description ?? "", e.service.category ?? "", e.service.platform, e.service.objective]
               .join(" ")
               .toLowerCase()
               .includes(text)
           : true,
-      );
+      )
+      .map((e) => this.enrich(e));
+    const sort: ServiceSort = query.sort ?? "relevance";
+    if (sort === "price") {
+      services.sort((a, b) => compareUnitPrice(a, b));
+    } else if (sort === "quality") {
+      services.sort((a, b) => compareQuality(a.quality, b.quality));
+    }
     return { services, catalogVersion: this.catalog.version };
+  }
+
+  /**
+   * Compare offers for a platform+objective across providers: per provider, its
+   * cheapest service that covers the requested quantity, cheapest first, with
+   * measured quality and the total price for the requested quantity. SUSPENDED
+   * nodes are excluded (§10.1).
+   */
+  compareOffers(input: {
+    platform: Service["platform"];
+    objective: Service["objective"];
+    quantity?: number;
+  }): OfferComparison {
+    if (input.quantity !== undefined && (!Number.isInteger(input.quantity) || input.quantity < 1)) {
+      throw new OpenSmmError("VALIDATION_FAILED", `invalid quantity: ${input.quantity}`);
+    }
+    const byProvider = new Map<string, CatalogEntry[]>();
+    for (const entry of this.catalog.list()) {
+      if (this.registry.get(entry.providerId)?.lifecycle === "SUSPENDED") continue;
+      if (entry.service.status !== "ACTIVE") continue;
+      if (entry.service.platform !== input.platform) continue;
+      if (entry.service.objective !== input.objective) continue;
+      const list = byProvider.get(entry.providerId);
+      if (list) list.push(entry);
+      else byProvider.set(entry.providerId, [entry]);
+    }
+
+    const offers: OfferComparisonEntry[] = [];
+    for (const [providerId, entries] of byProvider) {
+      // One offer per provider: its cheapest service for this platform+objective
+      // that covers the requested quantity (without a quantity: the cheapest overall).
+      const eligible =
+        input.quantity !== undefined
+          ? entries.filter(
+              (e) =>
+                input.quantity! >= e.service.minQuantity &&
+                input.quantity! <= e.service.maxQuantity,
+            )
+          : entries;
+      if (eligible.length === 0) continue; // this provider cannot deliver the requested quantity
+      const cheapest = eligible.reduce((a, b) =>
+        compareUnitPrice(a.service, b.service) <= 0 ? a : b,
+      );
+      const service = cheapest.service;
+      const quantityPriced = input.quantity ?? service.minQuantity;
+      const node = this.registry.get(providerId);
+      offers.push({
+        providerRef: node?.providerKey ?? providerId,
+        serviceId: service.serviceId,
+        serviceName: service.name,
+        rate: service.rate,
+        rateBasis: service.rateBasis,
+        minQuantity: service.minQuantity,
+        maxQuantity: service.maxQuantity,
+        quantityPriced,
+        total: quoteAmount(service.rate, service.rateBasis, quantityPriced),
+        quality: this.qualityFor(service, providerId),
+      });
+    }
+    offers.sort((a, b) =>
+      compareUnitPrice(
+        { rate: a.rate, rateBasis: a.rateBasis },
+        { rate: b.rate, rateBasis: b.rateBasis },
+      ),
+    );
+    return {
+      platform: input.platform,
+      objective: input.objective,
+      ...(input.quantity !== undefined ? { quantity: input.quantity } : {}),
+      offers,
+      catalogVersion: this.catalog.version,
+    };
+  }
+
+  /** Gateway enrichment for search results: providerRef + measured quality. */
+  private enrich(entry: CatalogEntry): Service {
+    const node = this.registry.get(entry.providerId);
+    return {
+      ...entry.service,
+      providerRef: node?.providerKey ?? entry.providerId,
+      ...(node?.provider.synthetic ? { synthetic: true } : {}),
+      quality: this.qualityFor(entry.service, entry.providerId),
+    };
+  }
+
+  private qualityFor(service: Service, providerId: string): OfferQuality {
+    const m = this.metrics.snapshot(providerId);
+    return {
+      ...(service.qualityTier !== undefined ? { tier: service.qualityTier } : {}),
+      orders: m.sampleSize,
+      ...(m.deliveredRatio !== undefined ? { deliveredRatio: m.deliveredRatio } : {}),
+      ...(m.measuredStartP50Sec !== undefined
+        ? { startLatencyMs: Math.round(m.measuredStartP50Sec * 1000) }
+        : {}),
+    };
   }
 
   getService(serviceId: string): Service {

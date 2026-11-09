@@ -1,0 +1,84 @@
+{
+  "format": 1,
+  "version": "2026-11-06T00:00:00Z",
+  "entries": [
+    {
+      "example": true,
+      "rating": 4.6,
+      "provenance": {
+        "providerId": "mock",
+        "externalServiceId": "1001",
+        "sourceUrl": "https://example.invalid/mock/services/1001",
+        "syncedAt": "2026-11-06T00:00:00Z"
+      },
+      "service": {
+        "serviceId": "osmm_svc_tg_members_std",
+        "name": "Telegram Channel Members — Standard",
+        "description": "Real-looking members for public Telegram channels. Start 0-1h, speed ~5k/day.",
+        "platform": "telegram",
+        "objective": "members",
+        "category": "Telegram / Members",
+        "rate": { "value": "2.412000", "currency": "USDC" },
+        "rateBasis": "PER_1000",
+        "minQuantity": 100,
+        "maxQuantity": 50000,
+        "qualityTier": "standard",
+        "parameters": [],
+        "capabilities": { "refill": true, "cancel": true, "dripfeed": false },
+        "status": "ACTIVE"
+      }
+    },
+    {
+      "example": true,
+      "rating": 4.2,
+      "provenance": {
+        "providerId": "mock",
+        "externalServiceId": "1002",
+        "sourceUrl": "https://example.invalid/mock/services/1002",
+        "syncedAt": "2026-11-06T00:00:00Z"
+      },
+      "service": {
+        "serviceId": "osmm_svc_tg_post_views",
+        "name": "Telegram Post Views",
+        "description": "Views on recent channel posts. Instant start.",
+        "platform": "telegram",
+        "objective": "views",
+        "category": "Telegram / Views",
+        "rate": { "value": "0.150000", "currency": "USDC" },
+        "rateBasis": "PER_1000",
+        "minQuantity": 100,
+        "maxQuantity": 100000,
+        "qualityTier": "economy",
+        "parameters": [],
+        "capabilities": { "refill": false, "cancel": false, "dripfeed": false },
+        "status": "ACTIVE"
+      }
+    },
+    {
+      "example": true,
+      "rating": 4.4,
+      "provenance": {
+        "providerId": "mock",
+        "externalServiceId": "1004",
+        "sourceUrl": "https://example.invalid/mock/services/1004",
+        "syncedAt": "2026-11-06T00:00:00Z"
+      },
+      "service": {
+        "serviceId": "osmm_svc_yt_views_std",
+        "name": "YouTube Views — Standard Retention",
+        "description": "Views with 1-5 min average watch time.",
+        "platform": "youtube",
+        "objective": "views",
+        "category": "YouTube / Views",
+        "rate": { "value": "2.400000", "currency": "USDC" },
+        "rateBasis": "PER_1000",
+        "minQuantity": 500,
+        "maxQuantity": 100000,
+        "qualityTier": "standard",
+        "parameters": [],
+        "capabilities": { "refill": true, "cancel": true, "dripfeed": true },
+        "status": "ACTIVE"
+      }
+    }
+  ]
+}

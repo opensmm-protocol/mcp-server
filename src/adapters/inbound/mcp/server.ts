@@ -102,7 +102,7 @@ export function createMcpServer(core: OpenSmmCore): McpServer {
     {
       title: "Search SMM services",
       description:
-        "Search the curated catalog of sellable SMM services by free text, platform and objective. Returns services with per-1000 rates, min/max and refill/cancel support.",
+        "Search the curated catalog of sellable SMM services by free text, platform and objective. Every offer carries providerRef (pseudonymous provider key) and quality (gateway-measured: orders, deliveredRatio, startLatencyMs). sort=price orders by normalized unit price, sort=quality by measured quality; default relevance keeps the catalog order. SUSPENDED providers are excluded.",
       inputSchema: {
         query: z.string().optional().describe("Free text, e.g. 'telegram members' or 'views'"),
         platform: z
@@ -111,12 +111,47 @@ export function createMcpServer(core: OpenSmmCore): McpServer {
         objective: z
           .enum(["followers", "members", "likes", "views", "reactions", "comments", "other"])
           .optional(),
+        sort: z
+          .enum(["price", "quality", "relevance"])
+          .optional()
+          .describe("Result order: price (cheapest first), quality (best measured first), relevance (catalog order, default)"),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     },
     async (args) => {
       try {
         return ok(core.searchServices(args));
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "compare_offers",
+    {
+      title: "Compare provider offers",
+      description:
+        "One offer per provider for a platform+objective, cheapest first, each with measured quality (orders, deliveredRatio, startLatencyMs) and the total price for the requested quantity (priced at the service minimum when quantity is omitted). SUSPENDED providers are excluded. Read-only.",
+      inputSchema: {
+        platform: z
+          .enum(["telegram", "instagram", "youtube", "tiktok", "x", "vk", "other"])
+          .describe("Social platform of the service"),
+        objective: z
+          .enum(["followers", "members", "likes", "views", "reactions", "comments", "other"])
+          .describe("Growth objective, e.g. 'members'"),
+        quantity: z
+          .number()
+          .int()
+          .min(1)
+          .optional()
+          .describe("Order quantity to price each offer for; defaults to each service's minimum"),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
+    },
+    async (args) => {
+      try {
+        return ok(core.compareOffers(args));
       } catch (err) {
         return fail(err);
       }

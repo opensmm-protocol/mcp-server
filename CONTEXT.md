@@ -2,7 +2,8 @@
 
 ## Stack
 
-Node.js ≥ 22.6 running TypeScript natively (no build step). ESM,
+Node.js ≥ 22.18 running TypeScript natively (no build step in dev; `npm run build`
+emits `dist/` for the npm package). ESM,
 `zod` for validation, `@modelcontextprotocol/sdk` for MCP, `ajv` for
 spec-schema tests, `viem` (dev) for x402.
 
@@ -12,6 +13,7 @@ spec-schema tests, `viem` (dev) for x402.
 npm install
 npm test            # node --test "test/**/*.test.ts" — must stay green
 npm run typecheck   # tsc --noEmit
+npm run build       # tsc -p tsconfig.build.json → dist/ (npm entry point)
 npm run rest        # REST gateway :3100
 npm run mcp         # MCP over stdio
 npm run mcp:http    # MCP Streamable HTTP :3200

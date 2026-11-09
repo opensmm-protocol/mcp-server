@@ -1,0 +1,142 @@
+name: Publish gateway image
+
+# Publishes the one-command node image to the GitHub Container Registry:
+#   docker run -p 127.0.0.1:8080:8080 -v opensmm-data:/data ghcr.io/opensmm-protocol/gateway
+# Runs on develop → main merges and on v* tags. No new secrets: the workflow
+# uses the built-in GITHUB_TOKEN only, inside the free ghcr quota.
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: publish-image-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/gateway
+
+jobs:
+  image:
+    name: Build, push and smoke the image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # latest tracks the default branch; a v* tag adds semver tags.
+      # Every build also gets a commit tag, so an exact revision stays pullable.
+      - name: Compute image tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=short,prefix=sha-
+
+      - name: Build and push linux/amd64
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          # A plain single-arch manifest keeps anonymous `docker pull` simple.
+          provenance: false
+          sbom: false
+
+      # The DoD requires `docker pull` without credentials. A package created by
+      # GITHUB_TOKEN is private by default; this flips it to public. If the
+      # token cannot change package visibility, the next step fails loudly.
+      - name: Make the package public
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+          response="$(
+            curl --silent --show-error --write-out '\n%{http_code}' \
+              --request PATCH \
+              --header "accept: application/vnd.github+json" \
+              --header "authorization: Bearer ${GH_TOKEN}" \
+              --header "x-github-api-version: 2022-11-28" \
+              --data '{"visibility":"public"}' \
+              "https://api.github.com/orgs/${OWNER}/packages/container/gateway" || true
+          )"
+          status="$(printf '%s' "$response" | tail -n 1)"
+          body="$(printf '%s' "$response" | sed '$d')"
+          echo "package visibility: ${status} ${body}" | head -c 500
+          echo
+          if [ "$status" != "200" ]; then
+            echo "::warning title=Package visibility not changed::ghcr answered ${status}; if the package stays private, anonymous pull fails and the next step stops the run."
+          fi
+
+      - name: Verify anonymous pull
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          docker logout ghcr.io || true
+          # GitHub applies a visibility change with a delay: retry before failing.
+          for attempt in 1 2 3; do
+            if docker pull "${IMAGE}@${DIGEST}"; then
+              echo "::notice title=Anonymous pull works::${IMAGE}@${DIGEST}"
+              exit 0
+            fi
+            echo "anonymous pull attempt ${attempt} failed"
+            if [ "$attempt" -lt 3 ]; then sleep 5; fi
+          done
+          {
+            echo "::error title=Image is not publicly pullable::Anonymous docker pull of ${IMAGE}@${DIGEST} failed. The DoD needs a public package."
+            echo "### Image is not publicly pullable"
+            echo
+            echo "Anonymous \`docker pull ${IMAGE}\` failed after the push (3 attempts, 5 s apart)."
+            echo "Set the package visibility to Public: GitHub → Organization → Packages → gateway → Package settings → Change visibility."
+            echo "Then re-run this workflow."
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+
+      - name: Smoke the published image
+        env:
+          SMOKE_IMAGE: ${{ env.IMAGE }}@${{ steps.build.outputs.digest }}
+        run: scripts/smoke-container.sh
+
+      - name: Record the published image
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          {
+            echo "### Published image"
+            echo
+            echo '```'
+            echo "${TAGS}"
+            echo "${IMAGE}@${DIGEST}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

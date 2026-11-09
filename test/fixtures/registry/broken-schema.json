@@ -1,0 +1,11 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.opensmm-protocol/mcp-server",
+  "description": "Package entry that is missing registryType and transport.",
+  "version": "0.1.0",
+  "packages": [
+    {
+      "identifier": "@opensmm/mcp-server"
+    }
+  ]
+}
