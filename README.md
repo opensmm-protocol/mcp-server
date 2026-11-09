@@ -305,6 +305,25 @@ Key properties (enforced by tests):
 - A quote is consumed exactly once; reuse returns the original order instead of
   double-charging.
 
+## How agents find us
+
+Four entry points, any of them leads to the same server:
+
+- **npm** — `npx -y @opensmm/mcp-server`, no install step and no API key
+  needed (Node.js ≥ 22.18).
+- **MCP Registry** — `io.github.opensmm-protocol/mcp-server`, searchable at
+  `https://registry.modelcontextprotocol.io/v0/servers?search=opensmm`.
+- **`llms.txt`** — [`llms.txt`](./llms.txt) is the compact machine-readable
+  summary of the protocol, the tools and the docs.
+- **Website** — <https://opensmm.dev> for the human-facing view of the same
+  material.
+
+There is no public remote MCP endpoint yet: the registry entry is
+package-only, and agents run the package locally over `stdio`.
+
+How the registry entry is built, updated and verified — including the weekly
+download metric — is documented in [`docs/REGISTRY.md`](./docs/REGISTRY.md).
+
 ## Roadmap
 
 1. ✅ Spec draft: JSON Schemas, errors, statuses, examples.

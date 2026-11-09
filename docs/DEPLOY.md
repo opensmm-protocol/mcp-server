@@ -37,6 +37,11 @@ Caddy issues and renews the certificate automatically. Agents then connect
 to `https://mcp.opensmm.dev/mcp` (Streamable HTTP, stateless, CORS-open);
 REST is available on the same host under `/v0`.
 
+How agents discover OpenSMM (npm package, MCP Registry entry, weekly download
+metric) is documented in [`REGISTRY.md`](./REGISTRY.md). A gateway an operator
+deploys like this is not published to the registry: the public entry stays
+package-only.
+
 ## Environment
 
 | Variable | Purpose |
