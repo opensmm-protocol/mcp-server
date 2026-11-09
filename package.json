@@ -5,7 +5,7 @@
   "license": "MIT",
   "type": "module",
   "engines": {
-    "node": ">=22.6"
+    "node": ">=22.18"
   },
   "keywords": [
     "mcp",
@@ -35,12 +35,13 @@
     "access": "public"
   },
   "files": [
+    "bin",
+    "dist",
     "src",
     "spec",
-    "data",
     "docs",
     "llms.txt",
-    "mcp.json",
+    "server.json",
     "README.md",
     "LICENSE"
   ],
@@ -48,6 +49,7 @@
     "opensmm": "./bin/opensmm.mjs"
   },
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "node --test \"test/**/*.test.ts\"",
     "rest": "node --env-file-if-exists=.env src/adapters/inbound/rest/server.ts",
@@ -55,7 +57,10 @@
     "mcp:http": "node --env-file-if-exists=.env src/adapters/inbound/mcp/http.ts",
     "gateway": "node --env-file-if-exists=.env src/adapters/inbound/gateway.ts",
     "x402:testnet": "node --env-file-if-exists=.env scripts/x402-testnet-run.ts",
-    "prepublishOnly": "npm run typecheck && npm test"
+    "manifests:sync": "node scripts/sync-manifests.mjs",
+    "manifests:check": "node scripts/sync-manifests.mjs --check",
+    "prepack": "npm run build",
+    "prepublishOnly": "npm run manifests:check && npm run typecheck && npm test"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",

@@ -58,9 +58,36 @@ Execution providers        ← SMM API v2 panels, native providers, ...
 > The same operation through REST and MCP produces the same domain objects.
 > Same `clientReference` → same `orderId`, on any transport.
 
+## Install from npm
+
+Requires Node.js ≥ 22.18 — native TypeScript type stripping is on by default
+from that version (Node 22.6–22.17 would need `--experimental-strip-types`,
+so those versions are not supported).
+
+```bash
+npx -y @opensmm/mcp-server
+```
+
+MCP client config (Claude Desktop / Kimi Code / Cursor):
+
+```json
+{
+  "mcpServers": {
+    "opensmm": {
+      "command": "npx",
+      "args": ["-y", "@opensmm/mcp-server"]
+    }
+  }
+}
+```
+
+No API keys are required: without `OPENSMM_*` variables the server starts on
+the built-in MockProvider catalog. Live provider and payment settings are
+opt-in (see below).
+
 ## Quick start (local, MockProvider)
 
-Requires Node.js ≥ 22.6 (runs TypeScript natively).
+Requires Node.js ≥ 22.18 (runs TypeScript natively).
 
 ```bash
 npm install
@@ -116,7 +143,9 @@ MCP (stdio, for Claude Desktop / Kimi Code / Cursor):
 }
 ```
 
-or from a checkout: `"command": "node", "args": ["/path/to/mcp-server/bin/opensmm.mjs"]`.
+or from a checkout: `"command": "node", "args": ["/path/to/mcp-server/bin/opensmm.mjs"]`
+(run `npm run build` once — the published entry point runs `dist/`, because
+Node refuses TypeScript type stripping inside `node_modules`).
 
 Tools: `get_capabilities`, `list_providers`, `register_provider`,
 `search_services`, `compare_offers`, `get_service`, `get_quote`, `create_order`,
