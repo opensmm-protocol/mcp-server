@@ -8,6 +8,10 @@
 
 ## Key facts for agents
 
+- Install: `npx -y @opensmm/mcp-server` (npm, stdio, Node.js >= 22.18, no API
+  key needed). MCP Registry entry: io.github.opensmm-protocol/mcp-server,
+  search https://registry.modelcontextprotocol.io/v0/servers?search=opensmm.
+  No public remote endpoint yet: run the package locally.
 - Protocol version: 0.1.0, URL prefix /v0.
 - One rule: the same operation via REST and MCP yields the same domain
   objects. Same clientReference → same orderId on any transport.
@@ -63,3 +67,4 @@ and who is more reliable for this». SUSPENDED providers never appear.
 - JSON Schemas: spec/v0/schemas/
 - Runnable examples: spec/v0/examples/
 - Provider onboarding (incl. a copy-paste AI prompt): docs/PROVIDER_ONBOARDING.md
+- MCP Registry entry and update procedure: docs/REGISTRY.md
