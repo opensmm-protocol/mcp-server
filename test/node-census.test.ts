@@ -22,16 +22,24 @@ type CensusNode = {
   error?: string;
 };
 
-async function census(...args: string[]): Promise<{ code: number; nodes: CensusNode[]; stderr: string }> {
+async function census(...args: string[]): Promise<{ code: number; nodes: CensusNode[]; stdout: string; stderr: string }> {
   try {
     const { stdout, stderr } = await execFileAsync(process.execPath, [SCRIPT, ...args]);
-    return { code: 0, nodes: JSON.parse(stdout) as CensusNode[], stderr };
+    return { code: 0, nodes: JSON.parse(stdout) as CensusNode[], stdout, stderr };
   } catch (err) {
-    const failure = err as { code?: number; stdout?: string };
+    const failure = err as { code?: number; stdout?: string; stderr?: string };
+    const stdout = failure.stdout ?? "";
+    let nodes: CensusNode[] = [];
+    try {
+      nodes = stdout ? (JSON.parse(stdout) as CensusNode[]) : [];
+    } catch {
+      nodes = [];
+    }
     return {
       code: typeof failure.code === "number" ? failure.code : 1,
-      nodes: failure.stdout ? (JSON.parse(failure.stdout) as CensusNode[]) : [],
-      stderr: "",
+      nodes,
+      stdout,
+      stderr: failure.stderr ?? "",
     };
   }
 }
@@ -39,6 +47,14 @@ async function census(...args: string[]): Promise<{ code: number; nodes: CensusN
 function startMockNode(): Promise<{ server: Server; baseUrl: string }> {
   const server = createServer((req, res) => {
     const path = new URL(req.url ?? "/", "http://localhost").pathname;
+    if (path.startsWith("/parked/")) {
+      res.writeHead(302, { location: "https://example.com/" }).end();
+      return;
+    }
+    if (path.startsWith("/spa/")) {
+      res.writeHead(200, { "content-type": "text/html" }).end("<html><body>app</body></html>");
+      return;
+    }
     if (req.method === "GET" && path === "/v0/services") {
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify({ services: [{ serviceId: "svc_1" }], catalogVersion: "mock-1" }));
@@ -106,6 +122,35 @@ describe("scripts/node-census.mjs", () => {
     assert.ok(nodes[0]!.error);
   });
 
+  it("does not follow redirects: a 3xx is down", async () => {
+    const { code, nodes } = await census("--url", `${mock.baseUrl}/parked`);
+    assert.equal(code, 0);
+    assert.equal(nodes[0]!.status, "down");
+    assert.match(nodes[0]!.error ?? "", /GET \/v0\/services: HTTP 302/);
+  });
+
+  it("does not count an HTML page as a catalog", async () => {
+    const { code, nodes } = await census("--url", `${mock.baseUrl}/spa`);
+    assert.equal(code, 0);
+    assert.equal(nodes[0]!.status, "down");
+    assert.equal(nodes[0]!.services, null);
+    assert.match(nodes[0]!.error ?? "", /GET \/v0\/services: not a JSON catalog/);
+  });
+
+  it("counts a duplicate URL once", async () => {
+    const { code, nodes, stderr } = await census("--url", mock.baseUrl, "--url", mock.baseUrl);
+    assert.equal(code, 0);
+    assert.equal(nodes.length, 1);
+    assert.match(stderr, /1 узел: 1 up, 0 down/);
+  });
+
+  it("rejects URLs with credentials and does not echo them", async () => {
+    const url = mock.baseUrl.replace("http://", "http://user:s3cret@");
+    const { code, stdout, stderr } = await census("--url", url);
+    assert.equal(code, 1);
+    assert.doesNotMatch(`${stdout}${stderr}`, /s3cret/);
+  });
+
   it("reads URLs from --file and ignores comments and blank lines", async () => {
     const dir = await mkdtemp(join(tmpdir(), "node-census-"));
     const file = join(dir, "nodes.txt");
@@ -123,7 +168,7 @@ describe("scripts/node-census.mjs", () => {
     assert.equal((await census("--url", "not-a-url")).code, 1);
     assert.equal((await census("--nope")).code, 1);
 
-    const tooMany = Array.from({ length: 21 }, () => ["--url", mock.baseUrl]).flat();
+    const tooMany = Array.from({ length: 21 }, (_, i) => ["--url", `${mock.baseUrl}/n${i}`]).flat();
     assert.equal((await census(...tooMany)).code, 1);
   });
 });

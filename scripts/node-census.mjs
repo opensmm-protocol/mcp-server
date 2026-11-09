@@ -12,13 +12,13 @@
 
 import { readFileSync } from "node:fs";
 
-const TIMEOUT_MS = 5000;
+const NODE_BUDGET_MS = 5000;
 const MAX_NODES = 20;
 
 const USAGE = `usage: node scripts/node-census.mjs (--url <url> | --file <path>)...
   --url <url>    gateway base URL, repeatable
   --file <path>  file with one URL per line ("#" starts a comment line)
-  max ${MAX_NODES} URLs per run; output is JSON on stdout, a summary on stderr`;
+  max ${MAX_NODES} unique URLs per run; output is JSON on stdout, a summary on stderr`;
 
 class UsageError extends Error {}
 
@@ -32,10 +32,15 @@ function parseUrl(value, source) {
   if (url.protocol !== "http:" && url.protocol !== "https:") {
     throw new UsageError(`${source}: only http(s) URLs are supported: ${value}`);
   }
-  return value.replace(/\/+$/, "");
+  if (url.username || url.password) {
+    throw new UsageError(
+      `${source}: credentials in the URL are not allowed: ${url.protocol}//${url.host}`,
+    );
+  }
+  return url.href.replace(/\/+$/, "");
 }
 
-export function parseArgs(argv) {
+function parseArgs(argv) {
   const urls = [];
   const files = [];
   for (let i = 0; i < argv.length; i += 1) {
@@ -70,11 +75,12 @@ export function parseArgs(argv) {
     }
   }
 
-  if (urls.length === 0) throw new UsageError("no URLs given; pass --url or --file");
-  if (urls.length > MAX_NODES) {
-    throw new UsageError(`${urls.length} URLs given; the limit is ${MAX_NODES} per run`);
+  const unique = [...new Set(urls)];
+  if (unique.length === 0) throw new UsageError("no URLs given; pass --url or --file");
+  if (unique.length > MAX_NODES) {
+    throw new UsageError(`${unique.length} unique URLs given; the limit is ${MAX_NODES} per run`);
   }
-  return urls;
+  return unique;
 }
 
 async function readBody(res) {
@@ -93,14 +99,15 @@ async function readBody(res) {
   }
 }
 
-async function probe(method, url, body) {
+async function probe(method, url, body, signal) {
   const headers = { accept: "application/json, text/event-stream" };
   if (body !== undefined) headers["content-type"] = "application/json";
   const res = await fetch(url, {
     method,
     headers,
+    redirect: "manual",
+    signal,
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-    signal: AbortSignal.timeout(TIMEOUT_MS),
   });
   return { res, body: await readBody(res) };
 }
@@ -111,54 +118,85 @@ function countOf(payload, key) {
 }
 
 function errorText(err) {
+  if (err && err.name === "AbortError") return `no answer in ${NODE_BUDGET_MS / 1000} s`;
   const cause = err && err.cause && err.cause.message ? `: ${err.cause.message}` : "";
   return `${(err && err.message) || String(err)}${cause}`;
 }
 
-export async function census(baseUrl) {
+async function census(baseUrl) {
   const started = Date.now();
-  const entry = { url: baseUrl, services: null, providers: null, initialize: false, latencyMs: 0, status: "down" };
+  const entry = {
+    url: baseUrl,
+    services: null,
+    providers: null,
+    initialize: false,
+    latencyMs: 0,
+    status: "down",
+  };
+  const errors = [];
   let servicesOk = false;
 
+  // One budget for all three probes, so a dead host costs 5 s, not 15.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), NODE_BUDGET_MS);
+
   try {
-    const { res, body } = await probe("GET", `${baseUrl}/v0/services`);
-    if (res.ok) {
-      servicesOk = true;
-      entry.services = countOf(body, "services");
-    } else {
-      entry.error = `GET /v0/services: HTTP ${res.status}`;
+    try {
+      const { res, body } = await probe("GET", `${baseUrl}/v0/services`, undefined, controller.signal);
+      const services = countOf(body, "services");
+      if (!res.ok) {
+        errors.push(`GET /v0/services: HTTP ${res.status}`);
+      } else if (services === null) {
+        errors.push("GET /v0/services: not a JSON catalog");
+      } else {
+        servicesOk = true;
+        entry.services = services;
+      }
+    } catch (err) {
+      errors.push(`GET /v0/services: ${errorText(err)}`);
     }
-  } catch (err) {
-    entry.error = `GET /v0/services: ${errorText(err)}`;
-  }
 
-  try {
-    const { res, body } = await probe("POST", `${baseUrl}/mcp`, {
-      jsonrpc: "2.0",
-      id: 1,
-      method: "initialize",
-      params: {
-        protocolVersion: "2025-06-18",
-        capabilities: {},
-        clientInfo: { name: "opensmm-node-census", version: "0.1.0" },
-      },
-    });
-    entry.initialize = res.ok && Boolean(body && body.result);
-    if (!entry.initialize && !entry.error) entry.error = `POST /mcp initialize: HTTP ${res.status}`;
-  } catch (err) {
-    if (!entry.error) entry.error = `POST /mcp initialize: ${errorText(err)}`;
-  }
+    try {
+      const { res, body } = await probe(
+        "POST",
+        `${baseUrl}/mcp`,
+        {
+          jsonrpc: "2.0",
+          id: 1,
+          method: "initialize",
+          params: {
+            protocolVersion: "2025-06-18",
+            capabilities: {},
+            clientInfo: { name: "opensmm-node-census", version: "0.1.0" },
+          },
+        },
+        controller.signal,
+      );
+      entry.initialize = res.ok && Boolean(body && body.result);
+      if (!entry.initialize) {
+        errors.push(
+          res.ok
+            ? "POST /mcp initialize: not an MCP response"
+            : `POST /mcp initialize: HTTP ${res.status}`,
+        );
+      }
+    } catch (err) {
+      errors.push(`POST /mcp initialize: ${errorText(err)}`);
+    }
 
-  try {
-    const { res, body } = await probe("GET", `${baseUrl}/v0/providers`);
-    if (res.ok) entry.providers = countOf(body, "providers");
-  } catch {
-    // Providers are informational: a node is judged by services + initialize.
+    try {
+      const { res, body } = await probe("GET", `${baseUrl}/v0/providers`, undefined, controller.signal);
+      if (res.ok) entry.providers = countOf(body, "providers");
+    } catch {
+      // Providers are informational: a node is judged by services + initialize.
+    }
+  } finally {
+    clearTimeout(timer);
   }
 
   entry.latencyMs = Date.now() - started;
   entry.status = servicesOk && entry.initialize ? "up" : "down";
-  if (entry.status === "up") delete entry.error;
+  if (entry.status === "down" && errors.length > 0) entry.error = errors.join("; ");
   return entry;
 }
 

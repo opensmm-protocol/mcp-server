@@ -4,10 +4,10 @@ How we count external OpenSMM nodes for the 30-day metric (ZHC-324).
 
 ## Definition of a node
 
-A public URL is a node when both checks answer 200:
+A public URL is a node when both checks pass (redirects are not followed):
 
-- `GET <url>/v0/services` — the node serves a catalog;
-- `POST <url>/mcp` with `initialize` (JSON-RPC) — the node speaks MCP.
+- `GET <url>/v0/services` — 200 with a JSON `services` array;
+- `POST <url>/mcp` with `initialize` (JSON-RPC) — 200 with a JSON-RPC `result`.
 
 `GET <url>/v0/providers` is informational: it never decides up or down.
 
