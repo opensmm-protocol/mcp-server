@@ -26,6 +26,7 @@ import addFormats from "ajv-formats";
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 
 export const DEFAULT_MANIFEST_PATH = path.resolve(scriptDir, "..", "server.json");
+export const PACKAGE_JSON_PATH = path.resolve(scriptDir, "..", "package.json");
 export const SCHEMA_PATH = path.join(scriptDir, "schemas", "server-2025-12-11.schema.json");
 export const MAX_TEXT_LENGTH = 100;
 
@@ -101,6 +102,22 @@ export function validateManifest(manifestPath = DEFAULT_MANIFEST_PATH) {
     if (typeof value === "string" && value.length > MAX_TEXT_LENGTH) {
       errors.push(`/${field} must be at most ${MAX_TEXT_LENGTH} characters (got ${value.length})`);
     }
+  }
+
+  // The MCP Registry proves npm package ownership by matching package.json
+  // `mcpName` against server.json `name`. Without this check CI stays green
+  // and `mcp-publisher publish` fails only on the release tag.
+  try {
+    const pkg = readJson(PACKAGE_JSON_PATH);
+    if (typeof pkg.mcpName !== "string" || pkg.mcpName.trim() === "") {
+      errors.push(
+        `/package.json must set "mcpName": "${manifest?.name}" so the registry can verify npm package ownership`,
+      );
+    } else if (pkg.mcpName !== manifest?.name) {
+      errors.push(`/package.json mcpName ("${pkg.mcpName}") must equal the manifest name ("${manifest?.name}")`);
+    }
+  } catch (error) {
+    errors.push(`cannot read or parse ${PACKAGE_JSON_PATH}: ${error.message}`);
   }
 
   return { valid: errors.length === 0, errors };

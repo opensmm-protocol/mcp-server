@@ -60,6 +60,17 @@ describe("registry manifest validator", () => {
     assertRejected("broken-remotes.json", "/remotes must be absent or empty");
   });
 
+  it("declares the registry name in package.json mcpName", () => {
+    const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
+    const manifest = JSON.parse(fs.readFileSync(path.join(repoRoot, "server.json"), "utf8"));
+
+    assert.equal(pkg.mcpName, manifest.name);
+  });
+
+  it("rejects a manifest whose name does not match package.json mcpName", () => {
+    assertRejected("broken-mcp-name.json", 'package.json mcpName ("io.github.opensmm-protocol/mcp-server")');
+  });
+
   it("rejects a package that breaks the registry schema", () => {
     assertRejected("broken-schema.json", "must have required property");
   });

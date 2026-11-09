@@ -1,6 +1,7 @@
 {
   "name": "@opensmm/mcp-server",
   "version": "0.1.0",
+  "mcpName": "io.github.opensmm-protocol/mcp-server",
   "description": "OpenSMM Protocol — open MCP server and REST gateway for ordering social media growth services (SMM) via AI agents. Provider-neutral, idempotent, x402/USDC-Base direct settlement.",
   "license": "MIT",
   "type": "module",
