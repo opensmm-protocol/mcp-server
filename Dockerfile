@@ -28,13 +28,18 @@ COPY bin ./bin
 COPY spec ./spec
 COPY llms.txt mcp.json README.md LICENSE ./
 
+# /data is the only writable path: the state snapshot. The node runs
+# unprivileged; a named volume inherits node:node from this directory.
+RUN mkdir -p /data && chown node:node /data
+USER node
+
 # Persist gateway state on a mounted volume: -v opensmm-data:/data
 ENV OPENSMM_STATE_FILE=/data/opensmm-state.json
 VOLUME /data
 
 EXPOSE 8080
 
-# One node, no keys: `docker run -p 8080:8080 <image>` serves the mock catalog.
+# One node, no keys: `docker run -p 127.0.0.1:8080:8080 <image>` serves the mock catalog.
 # PORT/payment/provider env override the defaults; CLI flags go after the entry:
 # `docker run <image> bin/opensmm.mjs gateway --port 9000`.
 ENTRYPOINT ["node"]

@@ -24,24 +24,16 @@ IMAGE="${SMOKE_IMAGE:-ghcr.io/opensmm-protocol/gateway:latest}"
 WAIT_SECONDS="${SMOKE_WAIT_SECONDS:-10}"
 CONTAINER="opensmm-smoke-$$"
 BASE_URL=""
-FAILED=0
 
 info() { printf 'smoke: %s\n' "$*"; }
-fail() {
-  FAILED=1
-  printf 'smoke: FAIL: %s\n' "$*" >&2
-}
 cleanup() {
   local status=$?
-  if [ "$status" -ne 0 ] || [ "$FAILED" -ne 0 ]; then
+  if [ "$status" -ne 0 ]; then
     printf '\n--- container logs (%s) ---\n' "$CONTAINER" >&2
     docker logs --tail 100 "$CONTAINER" 2>&1 || true
     printf -- '--- end of container logs ---\n\n' >&2
   fi
   docker rm --force "$CONTAINER" >/dev/null 2>&1 || true
-  if [ "$status" -eq 0 ] && [ "$FAILED" -ne 0 ]; then
-    exit 1
-  fi
   exit "$status"
 }
 trap cleanup EXIT
@@ -236,6 +228,7 @@ providers_body = get_json("/v0/providers")
 providers = (providers_body or {}).get("providers") or []
 provider_keys = {provider.get("providerKey") for provider in providers}
 check(bool(providers), f"/v0/providers lists {len(providers)} provider(s)")
+check(bool(provider_refs), f"catalog carries {len(provider_refs)} providerRef(s)")
 check(
     provider_refs.issubset(provider_keys),
     "/v0/providers covers every providerRef in the catalog",

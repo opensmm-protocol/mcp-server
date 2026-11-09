@@ -1,7 +1,7 @@
 name: Publish gateway image
 
 # Publishes the one-command node image to the GitHub Container Registry:
-#   docker run -p 8080:8080 -v opensmm-data:/data ghcr.io/opensmm-protocol/gateway
+#   docker run -p 127.0.0.1:8080:8080 -v opensmm-data:/data ghcr.io/opensmm-protocol/gateway
 # Runs on develop → main merges and on v* tags. No new secrets: the workflow
 # uses the built-in GITHUB_TOKEN only, inside the free ghcr quota.
 
@@ -99,20 +99,24 @@ jobs:
 
       - name: Verify anonymous pull
         env:
-          OWNER: ${{ github.repository_owner }}
           DIGEST: ${{ steps.build.outputs.digest }}
         run: |
           set -euo pipefail
           docker logout ghcr.io || true
-          if docker pull "${IMAGE}@${DIGEST}"; then
-            echo "::notice title=Anonymous pull works::${IMAGE}@${DIGEST}"
-            exit 0
-          fi
+          # GitHub applies a visibility change with a delay: retry before failing.
+          for attempt in 1 2 3; do
+            if docker pull "${IMAGE}@${DIGEST}"; then
+              echo "::notice title=Anonymous pull works::${IMAGE}@${DIGEST}"
+              exit 0
+            fi
+            echo "anonymous pull attempt ${attempt} failed"
+            if [ "$attempt" -lt 3 ]; then sleep 5; fi
+          done
           {
             echo "::error title=Image is not publicly pullable::Anonymous docker pull of ${IMAGE}@${DIGEST} failed. The DoD needs a public package."
             echo "### Image is not publicly pullable"
             echo
-            echo "Anonymous \`docker pull ${IMAGE}\` failed after the push."
+            echo "Anonymous \`docker pull ${IMAGE}\` failed after the push (3 attempts, 5 s apart)."
             echo "Set the package visibility to Public: GitHub → Organization → Packages → gateway → Package settings → Change visibility."
             echo "Then re-run this workflow."
           } >> "$GITHUB_STEP_SUMMARY"
@@ -126,12 +130,13 @@ jobs:
       - name: Record the published image
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
+          TAGS: ${{ steps.meta.outputs.tags }}
         run: |
           {
             echo "### Published image"
             echo
             echo '```'
+            echo "${TAGS}"
             echo "${IMAGE}@${DIGEST}"
-            echo "${IMAGE}:latest"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
