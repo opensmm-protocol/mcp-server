@@ -1,0 +1,151 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # Pinned deliberately: the MCP Registry docs forbid `releases/latest` for a
+  # binary that runs with `id-token: write`. Update together with the cosign
+  # identity below.
+  MCP_PUBLISHER_VERSION: v1.8.1
+
+jobs:
+  npm:
+    name: Publish npm package
+    runs-on: ubuntu-latest
+    environment: release
+    outputs:
+      published: ${{ steps.token.outputs.present }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - name: Verify release tag matches the package version
+        id: release
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_REF_TYPE}" != "tag" ] || [ "${GITHUB_REF_NAME#v}" = "${GITHUB_REF_NAME}" ]; then
+            echo "::error::Publishing runs only from a v* tag; got ${GITHUB_REF}."
+            exit 1
+          fi
+          tag_version="${GITHUB_REF_NAME#v}"
+          pkg_version="$(node -p "require('./package.json').version")"
+          manifest_version="$(node -p "require('./server.json').version")"
+          if [ "${tag_version}" != "${pkg_version}" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match package.json version ${pkg_version}."
+            exit 1
+          fi
+          if [ "${manifest_version}" != "${pkg_version}" ]; then
+            echo "::error::server.json version ${manifest_version} does not match package.json version ${pkg_version}."
+            exit 1
+          fi
+          echo "version=${pkg_version}" >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check for NPM_TOKEN
+        id: token
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "${NPM_TOKEN}" ]; then
+            echo "::notice title=npm publish skipped::NPM_TOKEN is not configured; skipping npm publish instead of failing the run."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check whether this version is already on npm
+        id: existing
+        if: steps.token.outputs.present == 'true'
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          if npm view "@opensmm/mcp-server@${VERSION}" version >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::notice title=npm publish skipped::@opensmm/mcp-server@${VERSION} is already on npm; continuing to the registry."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish to npm
+        if: steps.token.outputs.present == 'true' && steps.existing.outputs.exists != 'true'
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  registry:
+    name: Publish to the MCP Registry
+    needs: npm
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check npm publish result
+        id: gate
+        env:
+          NPM_PUBLISHED: ${{ needs.npm.outputs.published }}
+        run: |
+          if [ "${NPM_PUBLISHED}" = "true" ]; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice title=MCP Registry publish skipped::npm publish did not run, so the registry entry would point to a version that does not exist."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check out repository
+        if: steps.gate.outputs.publish == 'true'
+        uses: actions/checkout@v4
+
+      - name: Install cosign
+        if: steps.gate.outputs.publish == 'true'
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Download and verify mcp-publisher
+        if: steps.gate.outputs.publish == 'true'
+        run: |
+          set -euo pipefail
+          os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+          arch="$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')"
+          archive="mcp-publisher_${os}_${arch}.tar.gz"
+          base_url="https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}"
+
+          curl --fail --location --silent --show-error --output "$archive" "$base_url/$archive"
+          curl --fail --location --silent --show-error --output "$archive.sigstore.json" "$base_url/$archive.sigstore.json"
+          cosign verify-blob \
+            --bundle "$archive.sigstore.json" \
+            --certificate-identity "https://github.com/modelcontextprotocol/registry/.github/workflows/release.yml@refs/tags/${MCP_PUBLISHER_VERSION}" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            "$archive"
+          tar xzf "$archive" mcp-publisher
+          rm -f "$archive" "$archive.sigstore.json"
+          ./mcp-publisher --version
+
+      - name: Log in with GitHub OIDC
+        if: steps.gate.outputs.publish == 'true'
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish server.json
+        if: steps.gate.outputs.publish == 'true'
+        run: ./mcp-publisher publish
