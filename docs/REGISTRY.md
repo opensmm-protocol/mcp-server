@@ -43,7 +43,7 @@ byte-for-byte equal to `server.json`.
 | `version` | Must equal `package.json` `version` and `packages[].version`. |
 | `websiteUrl` | Project site. `homepage` is **not** a field of this schema — use `websiteUrl`. |
 | `repository` | `{ "url": ..., "source": "github" }`. |
-| `packages[]` | Requires `registryType`, `identifier`, `version` and `transport`. `runtimeHint: "npx"` tells clients how to run it. |
+| `packages[]` | The schema requires `registryType`, `identifier` and `transport`; `version` is optional there but our publish workflow requires it to equal `package.json` `version`. `runtimeHint: "npx"` tells clients how to run it. |
 | `remotes` | Omit. The schema allows it, but we have no public remote endpoint. |
 | `license` | **Not** a field of `ServerDetail` — it lives only in `package.json`. |
 
@@ -76,16 +76,28 @@ Publishing is driven by a git tag; version numbers are bumped by hand.
    git push origin v0.1.1
    ```
 
-6. `.github/workflows/registry-publish.yml` runs on `v*` tags and on manual
-   dispatch. It publishes in order: **npm first** (`npm publish --access
-   public`), **registry second** (`mcp-publisher`, GitHub OIDC login), because
-   the registry entry points at a package that must already exist. A missing
-   `NPM_TOKEN` secret makes the npm job skip with a message, not fail.
+6. `.github/workflows/registry-publish.yml` runs only on `v*` tags. Its first
+   step rejects any ref that is not a `v*` tag matching the `package.json`
+   version, so a manual `workflow_dispatch` run from a branch fails by design —
+   to re-run a publish, re-run that tag's workflow run. The workflow publishes
+   in order: **npm first** (`npm publish --access public`), **registry second**
+   (`mcp-publisher`, GitHub OIDC login), because the registry entry points at a
+   package that must already exist. Without the `NPM_TOKEN` secret the npm job
+   skips with a notice instead of failing, and the registry job is gated on that
+   job's `published` output — so without `NPM_TOKEN` nothing is published at
+   all: neither the package nor the entry.
 7. Verify the entry (next section).
 
-Until that workflow is merged, the same two steps are done by hand: `npm
-publish --access public`, then `npx @modelcontextprotocol/registry-cli publish
-server.json` after `login github-oidc`.
+When the tag workflow cannot be used, the same two steps can be run by hand
+with the official `mcp-publisher` CLI (`login github` is the local device
+flow; `login github-oidc` works only inside GitHub Actions):
+
+```bash
+npm publish --access public
+curl -sSfL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+./mcp-publisher login github
+./mcp-publisher publish
+```
 
 ## Verify the entry
 
