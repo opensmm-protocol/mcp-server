@@ -222,3 +222,81 @@ describe("compare_offers", () => {
     assert.equal(result.offers.length, 0);
   });
 });
+
+/** Two providers, mixed currencies: USDC 2.4 | EUR 1.8 + USDC 3.0 (same provider). */
+function createMixedCurrencyCore(): OpenSmmCore {
+  const catalog = new InMemoryCatalog(
+    [
+      makeEntry("mock", makeService("osmm_svc_tg_members_usd", "2.400000"), "1001"),
+      makeEntry(
+        "mock-2",
+        makeService("osmm_svc_tg_members_eur", "1.800000", {
+          rate: { value: "1.800000", currency: "EUR" },
+        }),
+        "2001",
+      ),
+      makeEntry(
+        "mock-2",
+        makeService("osmm_svc_tg_members_usd_eco", "3.000000", { qualityTier: "economy" }),
+        "2002",
+      ),
+    ],
+    "2026-11-08T00:00:00Z",
+  );
+  return new OpenSmmCore({ catalog, providers: [new MockProvider(), new StubProvider("mock-2")] });
+}
+
+describe("compare_offers currency handling", () => {
+  it("single-currency catalog → result reports that currency, nothing excluded", () => {
+    const core = createTwoProviderCore();
+    const result = core.compareOffers({ platform: "telegram", objective: "members" });
+    assert.equal(result.currency, "USDC");
+    assert.equal(result.excludedCurrencies, undefined);
+    for (const offer of result.offers) assert.equal(offer.total.currency, "USDC");
+  });
+
+  it("mixed currencies → ranked inside the most offered currency only, others reported", () => {
+    const core = createMixedCurrencyCore();
+    const result = core.compareOffers({ platform: "telegram", objective: "members", quantity: 1000 });
+    // Two USDC services vs one EUR service: USDC wins the default.
+    assert.equal(result.currency, "USDC");
+    assert.deepEqual(result.excludedCurrencies, ["EUR"]);
+    // The EUR offer is never ranked numerically against USDC: only USDC offers appear.
+    assert.deepEqual(
+      result.offers.map((o) => [o.providerRef, o.total.value, o.total.currency]),
+      [
+        ["provider-alpha", "2.400000", "USDC"],
+        ["provider-beta", "3.000000", "USDC"],
+      ],
+    );
+    assert.ok(!result.offers.some((o) => o.serviceId === "osmm_svc_tg_members_eur"));
+  });
+
+  it("explicit currency selects the comparison set", () => {
+    const core = createMixedCurrencyCore();
+    const eur = core.compareOffers({
+      platform: "telegram",
+      objective: "members",
+      quantity: 1000,
+      currency: "EUR",
+    });
+    assert.equal(eur.currency, "EUR");
+    assert.deepEqual(eur.excludedCurrencies, ["USDC"]);
+    assert.deepEqual(
+      eur.offers.map((o) => [o.providerRef, o.total.value, o.total.currency]),
+      [["provider-beta", "1.800000", "EUR"]],
+    );
+  });
+
+  it("requested currency nobody offers → no offers, currency echoed, all others excluded", () => {
+    const core = createMixedCurrencyCore();
+    const result = core.compareOffers({
+      platform: "telegram",
+      objective: "members",
+      currency: "GBP",
+    });
+    assert.equal(result.currency, "GBP");
+    assert.deepEqual(result.excludedCurrencies, ["EUR", "USDC"]);
+    assert.equal(result.offers.length, 0);
+  });
+});
