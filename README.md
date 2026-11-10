@@ -168,7 +168,11 @@ every offer with `providerRef` (the pseudonymous provider key) and `quality`
 catalog order). `compare_offers` (MCP tool) goes one step further: one
 cheapest offer per provider for a `platform`+`objective`, cheapest first,
 with measured quality and the total price for your `quantity` — SUSPENDED
-providers are excluded. `GET /v0/services` supports the same `sort` parameter.
+providers are excluded. Prices are ranked inside a single currency and never
+converted: `compare_offers` reports the `currency` it ranked in (pass
+`currency` to choose it, default is the most offered one) and lists any other
+currencies in `excludedCurrencies`. `GET /v0/services` supports the same
+`sort` parameter.
 
 `register_provider` (REST: `POST /v0/providers`) is provider self-onboarding
 (spec/v0 §10): the endpoint URL must pass the SSRF guard, the gateway

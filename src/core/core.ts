@@ -428,16 +428,40 @@ export class OpenSmmCore {
     platform: Service["platform"];
     objective: Service["objective"];
     quantity?: number;
+    /** Compare only offers priced in this currency; defaults to the most offered one. */
+    currency?: string;
   }): OfferComparison {
     if (input.quantity !== undefined && (!Number.isInteger(input.quantity) || input.quantity < 1)) {
       throw new OpenSmmError("VALIDATION_FAILED", `invalid quantity: ${input.quantity}`);
     }
-    const byProvider = new Map<string, CatalogEntry[]>();
+    const candidates: CatalogEntry[] = [];
     for (const entry of this.catalog.list()) {
       if (this.registry.get(entry.providerId)?.lifecycle === "SUSPENDED") continue;
       if (entry.service.status !== "ACTIVE") continue;
       if (entry.service.platform !== input.platform) continue;
       if (entry.service.objective !== input.objective) continue;
+      candidates.push(entry);
+    }
+
+    // Unit prices in different currencies are not comparable and the gateway holds
+    // no exchange rates, so the comparison stays inside ONE currency: the requested
+    // one, else the one most candidates are priced in (ties broken by code, so the
+    // choice is deterministic). Offers in other currencies are reported, not ranked.
+    const currencyCounts = new Map<string, number>();
+    for (const entry of candidates) {
+      const code = entry.service.rate.currency;
+      currencyCounts.set(code, (currencyCounts.get(code) ?? 0) + 1);
+    }
+    const currency =
+      input.currency ??
+      [...currencyCounts.entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))[0]?.[0];
+    const excludedCurrencies = [...currencyCounts.keys()]
+      .filter((code) => code !== currency)
+      .sort();
+
+    const byProvider = new Map<string, CatalogEntry[]>();
+    for (const entry of candidates) {
+      if (entry.service.rate.currency !== currency) continue;
       const list = byProvider.get(entry.providerId);
       if (list) list.push(entry);
       else byProvider.set(entry.providerId, [entry]);
@@ -485,6 +509,8 @@ export class OpenSmmCore {
       platform: input.platform,
       objective: input.objective,
       ...(input.quantity !== undefined ? { quantity: input.quantity } : {}),
+      ...(currency !== undefined ? { currency } : {}),
+      ...(excludedCurrencies.length > 0 ? { excludedCurrencies } : {}),
       offers,
       catalogVersion: this.catalog.version,
     };

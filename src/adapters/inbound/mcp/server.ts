@@ -132,7 +132,7 @@ export function createMcpServer(core: OpenSmmCore): McpServer {
     {
       title: "Compare provider offers",
       description:
-        "One offer per provider for a platform+objective, cheapest first, each with measured quality (orders, deliveredRatio, startLatencyMs) and the total price for the requested quantity (priced at the service minimum when quantity is omitted). SUSPENDED providers are excluded. Read-only.",
+        "One offer per provider for a platform+objective, cheapest first, each with measured quality (orders, deliveredRatio, startLatencyMs) and the total price for the requested quantity (priced at the service minimum when quantity is omitted). Offers are ranked inside one currency — prices are never converted; pass currency to choose it, otherwise the most offered currency is used and the others are reported in excludedCurrencies. SUSPENDED providers are excluded. Read-only.",
       inputSchema: {
         platform: z
           .enum(["telegram", "instagram", "youtube", "tiktok", "x", "vk", "other"])
@@ -146,6 +146,13 @@ export function createMcpServer(core: OpenSmmCore): McpServer {
           .min(1)
           .optional()
           .describe("Order quantity to price each offer for; defaults to each service's minimum"),
+        currency: z
+          .string()
+          .min(1)
+          .optional()
+          .describe(
+            "Compare only offers priced in this currency (e.g. 'USDC'); defaults to the most offered currency",
+          ),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     },
