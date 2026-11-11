@@ -7,20 +7,29 @@ restarts and redeploys.
 
 ## Run a node in 5 minutes
 
-One command starts a complete node: REST `/v0` and MCP `/mcp` on one port,
-on the built-in mock catalog. No keys, no external services, no code
-changes. Requires Node.js ≥ 22.18.
+From a checkout, two commands start a complete node: REST `/v0` and MCP
+`/mcp` on one port, on the built-in mock catalog. No keys, no external
+services, no code changes. Requires Node.js ≥ 22.18.
 
 ```bash
-npx -y @opensmm/mcp-server gateway --port 8080
+git clone https://github.com/opensmm-protocol/mcp-server.git
+cd mcp-server
+npm ci
+PORT=8080 OPENSMM_STATE_FILE=./opensmm-state.json npm run gateway
 ```
 
-If the published package does not contain the `gateway` command yet (npm
-publication is tracked in ZHC-287), run the same command from a checkout:
+When the npm package is published (ZHC-303), the same node runs without a
+checkout:
 
 ```bash
-npm ci && npm run build && node bin/opensmm.mjs gateway --port 8080
+npx -y @opensmm/mcp-server gateway --port 8080 --state ./opensmm-state.json
 ```
+
+`--port` and `--state` override the `PORT` and `OPENSMM_STATE_FILE`
+variables; `--help` lists the flags. Every variable is commented in
+`.env.example`. To publish the node to agents, put TLS in front (section
+«TLS + public endpoint (Caddy)» below) and set `OPENSMM_PROVIDER_PAYOUT`,
+so that the orders of this node carry your payout address.
 
 The node reports its port on stderr:
 
@@ -34,6 +43,7 @@ Check the node:
 curl -s http://localhost:8080/v0/capabilities   # protocol version, commands
 curl -s http://localhost:8080/v0/services       # served catalog
 curl -s http://localhost:8080/v0/providers      # provider nodes and metrics
+node scripts/node-census.mjs --url http://localhost:8080   # "status": "up"
 ```
 
 What you see after the start:
@@ -53,37 +63,31 @@ What you see after the start:
 - MCP clients connect to `http://localhost:8080/mcp` (Streamable HTTP,
   stateless, open CORS). `tools/list` returns 11 tools.
 
-Keep the state across restarts with a snapshot file:
+## Docker (optional)
+
+The supported Docker route today is a local build from this checkout. The
+prebuilt image in the GitHub Container Registry is still private (ZHC-370),
+so `docker run … ghcr.io/opensmm-protocol/gateway` and `docker compose up`
+from a clean clone do not work yet — the ghcr commands below describe the
+intended shape once the image is public.
+
+Build and run from the checkout:
 
 ```bash
-npx -y @opensmm/mcp-server gateway --port 8080 --state ./opensmm-state.json
+docker build -t opensmm-gateway .
+docker run -d --name opensmm -p 127.0.0.1:8080:8080 -v opensmm-data:/data opensmm-gateway
 ```
 
-`--port` and `--state` override the `PORT` and `OPENSMM_STATE_FILE`
-variables; `--help` lists the flags. Every variable is commented in
-`.env.example`. To publish the node to agents, put TLS in front (section
-«TLS + public endpoint (Caddy)» below) and set `OPENSMM_PROVIDER_PAYOUT`,
-so that the orders of this node carry your payout address.
-
-## Docker (recommended)
-
-The image is published to the GitHub Container Registry on every merge to
-`main` and on `v*` tags (`.github/workflows/publish.yml`). No build, no
-checkout, no keys:
+When the ghcr image becomes public, the same node runs without a build —
+no checkout, no keys:
 
 ```bash
-docker run -p 127.0.0.1:8080:8080 -v opensmm-data:/data ghcr.io/opensmm-protocol/gateway
+docker run -d --name opensmm -p 127.0.0.1:8080:8080 -v opensmm-data:/data ghcr.io/opensmm-protocol/gateway
 ```
 
 The port binds to loopback only: the node has no TLS and no authentication
 of its own, so it must not listen on a public interface. Put Caddy in front
 for a public node (section «TLS + public endpoint (Caddy)»).
-
-Add `-d --name opensmm` to run it in the background:
-
-```bash
-docker run -d --name opensmm -p 127.0.0.1:8080:8080 -v opensmm-data:/data ghcr.io/opensmm-protocol/gateway
-```
 
 The node starts on the mock catalog and answers on
 `http://localhost:8080` (`/v0/services`, `/v0/providers`, `/mcp`) within a
@@ -94,10 +98,10 @@ docker run -d --name opensmm -p 127.0.0.1:8080:8080 -v opensmm-data:/data \
   -e OPENSMM_REST_V1_BASE_URL=https://provider.example/api/v1 \
   -e OPENSMM_REST_V1_API_KEY=your-reseller-key \
   -e OPENSMM_PROVIDER_PAYOUT=0xYourUsdcBaseAddress \
-  ghcr.io/opensmm-protocol/gateway:latest
+  opensmm-gateway   # or ghcr.io/opensmm-protocol/gateway:latest once the image is public
 ```
 
-or `docker compose up -d` (see `docker-compose.yml`).
+or `docker compose up -d` once the image is public (see `docker-compose.yml`).
 
 A node with a live provider that other people can reach must also set the
 payment rail: `-e X402_FACILITATOR_URL=https://x402.org/facilitator -e
@@ -105,20 +109,18 @@ X402_PAYTO_ADDRESS=0xYourUsdcBaseAddress`. Without `X402_FACILITATOR_URL`
 the gateway keeps the dev-only mock rail, which settles orders without any
 payment — every order then spends the operator's provider balance for free.
 
-Image tags: `latest` (default branch), `X.Y.Z` and `X.Y` (on a `vX.Y.Z`
-tag), `sha-<commit>` for every build. The image is `linux/amd64`. The
-package is public, so `docker pull` needs no credentials; the publish
-workflow fails if an anonymous pull does not work. The image is built from
-this repository's `Dockerfile`; `scripts/smoke-container.sh` runs a
-container end to end (catalog, MCP `initialize`, `tools/list`, order
-idempotency, providers). CI repeats the same smoke test on every pull
-request.
+Image tags once the registry is public: `latest` (default branch), `X.Y.Z`
+and `X.Y` (on a `vX.Y.Z` tag), `sha-<commit>` for every build. The image is
+`linux/amd64`. It is built from this repository's `Dockerfile` on every
+merge to `main` and on `v*` tags (`.github/workflows/publish.yml`);
+`scripts/smoke-container.sh` runs a container end to end (catalog, MCP
+`initialize`, `tools/list`, order idempotency, providers). CI repeats the
+same smoke test on every pull request.
 
-To test local changes instead of the published image, build it yourself —
-development only:
+Verify the node with the census tool:
 
 ```bash
-docker build -t opensmm-gateway . && docker run -d -p 127.0.0.1:8080:8080 -v opensmm-data:/data opensmm-gateway
+node scripts/node-census.mjs --url http://localhost:8080   # "status": "up"
 ```
 
 The state file (`/data/opensmm-state.json`) contains provider credentials —
