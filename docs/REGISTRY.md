@@ -76,11 +76,13 @@ Publishing is driven by a git tag; version numbers are bumped by hand.
    git push origin v0.1.1
    ```
 
-6. `.github/workflows/registry-publish.yml` runs only on `v*` tags. Its first
-   step rejects any ref that is not a `v*` tag matching the `package.json`
-   version, so a manual `workflow_dispatch` run from a branch fails by design —
-   to re-run a publish, re-run that tag's workflow run. The workflow publishes
-   in order: **npm first** (`npm publish --access public`), **registry second**
+6. `.github/workflows/registry-publish.yml` runs only on `v*` tags. Its third
+   step (`Verify release tag matches the package version`, after checkout and
+   `setup-node`) rejects any ref that is not a `v*` tag and also fails when the
+   tag, `package.json` and `server.json` versions disagree — so a manual
+   `workflow_dispatch` run from a branch fails by design; to re-run a publish,
+   re-run that tag's workflow run. The workflow publishes in order: **npm
+   first** (`npm publish --access public`), **registry second**
    (`mcp-publisher`, GitHub OIDC login), because the registry entry points at a
    package that must already exist. Without the `NPM_TOKEN` secret the npm job
    skips with a notice instead of failing, and the registry job is gated on that
@@ -88,16 +90,12 @@ Publishing is driven by a git tag; version numbers are bumped by hand.
    all: neither the package nor the entry.
 7. Verify the entry (next section).
 
-When the tag workflow cannot be used, the same two steps can be run by hand
-with the official `mcp-publisher` CLI (`login github` is the local device
-flow; `login github-oidc` works only inside GitHub Actions):
-
-```bash
-npm publish --access public
-curl -sSfL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
-./mcp-publisher login github
-./mcp-publisher publish
-```
+The workflow is the only supported publish path. It pins `mcp-publisher` to
+`MCP_PUBLISHER_VERSION` and verifies the release's sigstore bundle with
+`cosign` before running it. Do not publish by hand with a `mcp-publisher`
+binary from `releases/latest`: that runs an unverified binary with your GitHub
+token. When a tag run cannot be re-run, bump the patch version and push a new
+tag through the same flow.
 
 ## Verify the entry
 

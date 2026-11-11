@@ -18,7 +18,7 @@ What it does differently:
 - Direct settlement is canonical: orders carry x402 payment requirements (USDC on Base) with the provider's own payout address as payTo. A gateway routes and measures; it never custodies funds.
 
 Repo: https://github.com/opensmm-protocol/mcp-server (spec + reference gateway, 86 tests, MIT)
-MCP client config: `{ "command": "npx", "args": ["-y", "@opensmm/mcp-server"] }`
+Run it from source: `git clone https://github.com/opensmm-protocol/mcp-server.git && cd mcp-server && npm ci && npm run gateway` (npm package not published yet)
 
 Happy to answer questions about the x402 flow, the provider SPI, or why payment and execution are separate state machines.
 
@@ -36,7 +36,7 @@ Repo: https://github.com/opensmm-protocol/mcp-server
 - Direct settlement: agents pay providers in USDC on Base via x402; the gateway never touches funds
 - Spec-first: JSON Schemas for every model, 8 runnable examples, 86 tests
 
-Agents can install it as an MCP server: `npx -y @opensmm/mcp-server`.
+Agents can run it as an MCP server from source: `git clone https://github.com/opensmm-protocol/mcp-server.git && cd mcp-server && npm ci && npm run gateway` (npm package not published yet).
 Feedback welcome — especially on the spec (spec/v0) and the provider SPI.
 
 ## X/Twitter thread (3 posts)
@@ -46,4 +46,4 @@ https://github.com/opensmm-protocol/mcp-server
 
 2/ How it works: providers self-register with one call (SSRF-guarded, healthchecked). Legacy panel APIs are adapted gateway-side, so onboarding is zero-code. Agents see a pseudonymous showcase ranked by measured quality — start latency, delivered ratio, retention — with an open tier formula.
 
-3/ Money never transits the gateway: orders carry x402 payment requirements with the provider's own payout address. The protocol routes and measures; it is not a party to the trade. MIT, spec-first, 86 tests. `npx -y @opensmm/mcp-server` to try it from your agent.
+3/ Money never transits the gateway: orders carry x402 payment requirements with the provider's own payout address. The protocol routes and measures; it is not a party to the trade. MIT, spec-first, 86 tests. Run a node from your checkout: `git clone https://github.com/opensmm-protocol/mcp-server.git && npm ci && npm run gateway`.

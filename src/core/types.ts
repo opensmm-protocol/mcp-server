@@ -273,6 +273,13 @@ export interface OfferComparison {
   objective: Objective;
   /** The requested quantity, when one was given. */
   quantity?: number;
+  /**
+   * Currency every offer is priced in. Prices are never converted, so offers in
+   * other currencies are left out of the ranking. Absent when nothing matched.
+   */
+  currency?: string;
+  /** Currencies present in the catalog but left out of the ranking. Absent when empty. */
+  excludedCurrencies?: string[];
   offers: OfferComparisonEntry[];
   catalogVersion: string;
 }

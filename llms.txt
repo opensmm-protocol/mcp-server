@@ -8,10 +8,9 @@
 
 ## Key facts for agents
 
-- Install: `npx -y @opensmm/mcp-server` (npm, stdio, Node.js >= 22.18, no API
-  key needed). MCP Registry entry: io.github.opensmm-protocol/mcp-server,
+- Install: from source — `git clone https://github.com/opensmm-protocol/mcp-server.git && cd mcp-server && npm ci && npm run gateway` (REST /v0 + MCP /mcp on :8080, Node.js >= 22.18, no API key needed). npm package `npx -y @opensmm/mcp-server` — not published yet (ZHC-303). MCP Registry entry: io.github.opensmm-protocol/mcp-server,
   search https://registry.modelcontextprotocol.io/v0/servers?search=opensmm.
-  No public remote endpoint yet: run the package locally.
+  No public remote endpoint yet: run the node locally.
 - Protocol version: 0.1.0, URL prefix /v0.
 - One rule: the same operation via REST and MCP yields the same domain
   objects. Same clientReference → same orderId on any transport.
@@ -56,10 +55,14 @@ serving it) and quality (measured orders, deliveredRatio, startLatencyMs;
 ratio/latency appear only with sufficient sample). sort=price orders by
 normalized unit price, sort=quality by measured quality, sort=relevance (the
 default) keeps the catalog order; GET /v0/services accepts the same sort
-parameter. compare_offers (platform + objective [+ quantity]) returns one
-cheapest offer per provider, cheapest first, each with its measured quality
-and the total price for your quantity — the direct answer to «who is cheaper
-and who is more reliable for this». SUSPENDED providers never appear.
+parameter. compare_offers (platform + objective [+ quantity] [+ currency])
+returns one cheapest offer per provider, cheapest first, each with its
+measured quality and the total price for your quantity — the direct answer to
+«who is cheaper and who is more reliable for this». Offers are ranked inside a
+single currency: prices are never converted, so offers in other currencies are
+reported in excludedCurrencies instead of being ranked against them (pass
+`currency` to pick the one you pay in; default is the most offered currency).
+SUSPENDED providers never appear.
 
 ## Docs
 
