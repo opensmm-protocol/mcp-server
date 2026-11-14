@@ -56,6 +56,44 @@ Response:
 }
 ```
 
+## Copy this profile
+
+[`examples/provider-profile.example.json`](../examples/provider-profile.example.json)
+is a ready-to-edit registration payload for the `rest-v1` dialect. It holds
+placeholders only — `endpoint` (your panel's base URL) and `apiKey` — so it is
+safe to read and impossible to mistake for a live credential. Three steps from
+that file to a registered node:
+
+1. **Copy and fill.** Copy the file outside the repository as `my-panel.json`,
+   replace `endpoint` with your panel's base URL (the adapter appends
+   `/services`, `/orders` and `/orders/:id` to it) and `apiKey` with the
+   panel's key. `smm-v2` panels add `profile` on top of these two; `rest-v1`
+   needs nothing else. The filled file is a secret — keep it out of git and out
+   of chats.
+2. **Check the panel before you hand it over.** The doctor performs the
+   read-only Level-0 checks (HTTPS + JSON, balance, catalog, envelope, field
+   aliases) and prints the `profile` name to use, without ever printing the key:
+
+   ```bash
+   node src/cli/provider-doctor.ts --url https://<your-panel>.example/api/v2 --key "<your api key>"
+   ```
+
+   The doctor speaks `smm-v2` only. For `rest-v1` (this sample) the gateway's
+   healthcheck in the next step is the equivalent check: it lists your
+   `GET /services` once and returns `offersCount`.
+3. **Register, then verify the listing.** Post the filled payload to the
+   gateway and read back the pseudonymous key and the offer count:
+
+   ```bash
+   curl -X POST http://localhost:8080/v0/providers \
+     -H 'content-type: application/json' \
+     --data @my-panel.json
+   curl -s http://localhost:8080/v0/providers
+   ```
+
+   A green result is `lifecycle: "UNVERIFIED"` with `offersCount` above zero;
+   your offers are then visible in `GET /v0/services` and `search_services`.
+
 ## What happens under the hood
 
 1. **SSRF guard** — your endpoint must be a public `https://` URL (spec/v0 §10.2).
