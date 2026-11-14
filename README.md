@@ -92,6 +92,9 @@ the census tool: [`docs/NODES.md`](./docs/NODES.md).
 How an agent orders from that node, over REST and over MCP, with the
 idempotent replay: [`examples/`](./examples/README.md).
 
+Running a public node? Report its URL for the weekly census via the issue template:
+[`issues/new?template=node-report.md`](https://github.com/opensmm-protocol/mcp-server/issues/new?template=node-report.md).
+
 ## The one rule of the protocol
 
 > The same operation through REST and MCP produces the same domain objects.

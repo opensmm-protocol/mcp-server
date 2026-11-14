@@ -36,6 +36,10 @@ one definition of a node, so a local PASS means the census sees the same node.
 For a node behind a proxy or on a public host, pass the URL the census will
 call (redirects are not followed — use the final URL).
 
+Once your node passes locally and is publicly accessible, submit its URL for the
+weekly census via the issue template:
+[`issues/new?template=node-report.md`](https://github.com/opensmm-protocol/mcp-server/issues/new?template=node-report.md).
+
 ## Run the census
 
 ```sh
