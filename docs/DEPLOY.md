@@ -63,6 +63,9 @@ What you see after the start:
 - MCP clients connect to `http://localhost:8080/mcp` (Streamable HTTP,
   stateless, open CORS). `tools/list` returns 11 tools.
 
+Troubleshooting common startup issues (port conflict, Node version, state file permissions, offline npm ci, mock catalog):
+[`docs/TROUBLESHOOTING.md`](./TROUBLESHOOTING.md).
+
 ## Docker (optional)
 
 The supported Docker route today is a local build from this checkout. The
