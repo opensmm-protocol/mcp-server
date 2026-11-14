@@ -55,6 +55,46 @@ transport.
 Run without `--quote` and the MCP client prices a new quote itself (useful on
 its own; it cannot reuse an order that was made from a different quote).
 
+## 4. Connect a node to an MCP client (Подключить узел к MCP-клиенту)
+
+To use your node from Claude Desktop, Cursor, or any MCP-compatible client, add
+one of the following configuration blocks to your client's settings
+(e.g., `claude_desktop_config.json` or `.cursor/mcp.json`).
+
+The server configuration aligns with [`../mcp.json`](../mcp.json)
+(`io.github.opensmm-protocol/mcp-server`, package `@opensmm/mcp-server`), which
+registers the stdio transport.
+
+### Stdio transport (direct process)
+
+Runs the MCP server locally via `npm run mcp`:
+
+```json
+{
+  "mcpServers": {
+    "opensmm": {
+      "command": "npm",
+      "args": ["run", "mcp"],
+      "cwd": "/path/to/mcp-server"
+    }
+  }
+}
+```
+
+### HTTP transport (running node)
+
+Connects over Streamable HTTP to a running gateway (`npm run gateway` on `:8080`):
+
+```json
+{
+  "mcpServers": {
+    "opensmm": {
+      "url": "http://127.0.0.1:8080/mcp"
+    }
+  }
+}
+```
+
 ## What the scripts talk to
 
 | Script | Path | Calls |

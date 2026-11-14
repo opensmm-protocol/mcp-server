@@ -9,6 +9,7 @@
 
 import assert from "node:assert/strict";
 import { execFile, spawn, type ChildProcess } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -21,6 +22,60 @@ const REPO_ROOT = path.resolve(import.meta.dirname, "..");
 const BIN = path.join(REPO_ROOT, "bin", "opensmm.mjs");
 const REST_EXAMPLE = path.join(REPO_ROOT, "examples", "rest-client.mjs");
 const MCP_EXAMPLE = path.join(REPO_ROOT, "examples", "mcp-client.mjs");
+const EXAMPLES_README = path.join(REPO_ROOT, "examples", "README.md");
+const PACKAGE_JSON = path.join(REPO_ROOT, "package.json");
+const MCP_JSON = path.join(REPO_ROOT, "mcp.json");
+
+export function extractJsonBlocks(markdown: string): string[] {
+  const matches: string[] = [];
+  const re = /```json\s*\n([\s\S]*?)\n```/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(markdown)) !== null) {
+    matches.push(m[1].trim());
+  }
+  return matches;
+}
+
+export function extractNpmScriptsFromBlock(rawJson: string, parsed: unknown): string[] {
+  const found = new Set<string>();
+  if (typeof parsed === "object" && parsed !== null) {
+    const obj = parsed as Record<string, unknown>;
+    if (obj.mcpServers && typeof obj.mcpServers === "object") {
+      for (const s of Object.values(obj.mcpServers as Record<string, unknown>)) {
+        if (typeof s === "object" && s !== null) {
+          const sObj = s as Record<string, unknown>;
+          if (sObj.command === "npm" && Array.isArray(sObj.args)) {
+            const runIdx = sObj.args.indexOf("run");
+            if (runIdx !== -1 && typeof sObj.args[runIdx + 1] === "string") {
+              found.add(sObj.args[runIdx + 1] as string);
+            }
+          }
+        }
+      }
+    }
+  }
+  const re = /\bnpm\s+run\s+([a-zA-Z0-9_\-:]+)/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(rawJson)) !== null) {
+    found.add(match[1]);
+  }
+  return Array.from(found);
+}
+
+export function validateConfigBlock(
+  rawJson: string,
+  packageJson: { scripts?: Record<string, string> },
+): { parsed: unknown; scripts: string[] } {
+  const parsed = JSON.parse(rawJson);
+  const scripts = extractNpmScriptsFromBlock(rawJson, parsed);
+  const availableScripts = packageJson.scripts ?? {};
+  for (const script of scripts) {
+    if (!(script in availableScripts)) {
+      throw new Error(`script "${script}" from configuration block is not defined in package.json`);
+    }
+  }
+  return { parsed, scripts };
+}
 
 /** A node must not inherit provider/payment config from the developer shell. */
 const CLEAN_ENV = Object.fromEntries(
@@ -157,5 +212,102 @@ describe("examples — REST and MCP clients against a mock node", () => {
     assert.equal(run.code, 0, `the MCP replay of the REST order failed:\n${run.stderr}`);
     assert.equal(field(run.stdout, "order"), restOrder, "REST and MCP must share one orderId");
     assert.equal(field(run.stdout, "replay"), restOrder);
+  });
+});
+
+describe("examples/README.md — MCP client configuration (ZHC-680)", () => {
+  const pkg = JSON.parse(readFileSync(PACKAGE_JSON, "utf8"));
+  const mcpManifest = JSON.parse(readFileSync(MCP_JSON, "utf8"));
+
+  it("examples/README.md has exactly two MCP configuration blocks and both parse as JSON", () => {
+    const content = readFileSync(EXAMPLES_README, "utf8");
+    const blocks = extractJsonBlocks(content);
+    assert.equal(
+      blocks.length,
+      2,
+      `examples/README.md must contain exactly 2 JSON configuration blocks, found ${blocks.length}`,
+    );
+
+    for (let i = 0; i < blocks.length; i++) {
+      assert.doesNotThrow(() => {
+        JSON.parse(blocks[i]);
+      }, `block ${i + 1} must be valid JSON`);
+    }
+
+    const [stdioBlock, httpBlock] = blocks.map((b) => JSON.parse(b) as Record<string, any>);
+    assert.ok(
+      stdioBlock.mcpServers?.opensmm?.command,
+      "first block must configure stdio transport via command",
+    );
+    assert.ok(
+      httpBlock.mcpServers?.opensmm?.url,
+      "second block must configure HTTP transport via url",
+    );
+    assert.match(
+      httpBlock.mcpServers.opensmm.url,
+      /\/mcp$/,
+      "HTTP transport url must point to /mcp endpoint",
+    );
+  });
+
+  it("all npm run scripts in configuration blocks exist in package.json", () => {
+    const content = readFileSync(EXAMPLES_README, "utf8");
+    const blocks = extractJsonBlocks(content);
+    assert.ok(blocks.length >= 2, "README must contain configuration blocks");
+
+    let validatedScriptCount = 0;
+    for (const raw of blocks) {
+      const { scripts } = validateConfigBlock(raw, pkg);
+      for (const s of scripts) {
+        assert.ok(s in (pkg.scripts ?? {}), `script "${s}" must exist in package.json`);
+        validatedScriptCount++;
+      }
+    }
+    assert.ok(validatedScriptCount > 0, "at least one npm run script (mcp) must be validated");
+  });
+
+  it("fails when a configuration block references a script not in package.json", () => {
+    const fakeBlock = JSON.stringify({
+      mcpServers: {
+        opensmm: {
+          command: "npm",
+          args: ["run", "invented-nonexistent-script-xyz"],
+        },
+      },
+    });
+
+    assert.throws(
+      () => validateConfigBlock(fakeBlock, pkg),
+      /script "invented-nonexistent-script-xyz" from configuration block is not defined in package\.json/,
+    );
+  });
+
+  it("stdio configuration aligns with mcp.json in root", () => {
+    const content = readFileSync(EXAMPLES_README, "utf8");
+    const blocks = extractJsonBlocks(content);
+    assert.ok(blocks.length >= 1, "README must contain configuration blocks");
+
+    const stdioBlock = JSON.parse(blocks[0]);
+    assert.equal(
+      stdioBlock.mcpServers?.opensmm?.command,
+      "npm",
+      "stdio block uses npm command",
+    );
+    assert.deepEqual(
+      stdioBlock.mcpServers?.opensmm?.args,
+      ["run", "mcp"],
+      "stdio block runs mcp script",
+    );
+
+    assert.equal(
+      mcpManifest.packages?.[0]?.transport?.type,
+      "stdio",
+      "mcp.json declares stdio transport",
+    );
+    assert.equal(
+      mcpManifest.packages?.[0]?.identifier,
+      "@opensmm/mcp-server",
+      "mcp.json declares package identifier @opensmm/mcp-server",
+    );
   });
 });
