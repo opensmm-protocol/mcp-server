@@ -1,5 +1,9 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 import { describe, it } from "node:test";
+import { Ajv2020 } from "ajv/dist/2020.js";
+import addFormats from "ajv-formats";
 import {
   diagnoseProvider,
   formatDoctorReport,
@@ -414,5 +418,54 @@ describe("provider-doctor: Level-0 panel pre-onboarding checks", () => {
     assert.equal(exitCode, 0);
     assert.match(loggedOutputs.join("\n"), /ALL CHECKS PASSED/);
     assert.equal(loggedOutputs.join("\n").includes("test-key-abc"), false);
+  });
+});
+
+describe("provider-profile example (docs onboarding entry point)", () => {
+  const repoRoot = path.resolve(import.meta.dirname, "..");
+  const examplePath = path.join(repoRoot, "examples", "provider-profile.example.json");
+  const schemaPath = path.join(
+    repoRoot,
+    "spec",
+    "v0",
+    "schemas",
+    "register-provider-request.json",
+  );
+
+  it("satisfies the provider registration schema without any network call", () => {
+    // File-only check: no gateway, no panel, no credential is used.
+    const schema = JSON.parse(fs.readFileSync(schemaPath, "utf8"));
+    const profile = JSON.parse(fs.readFileSync(examplePath, "utf8"));
+
+    const ajv = new Ajv2020({ allErrors: true, strict: true });
+    const applyFormats =
+      typeof addFormats === "function" ? addFormats : (addFormats as any).default;
+    applyFormats(ajv);
+
+    const validate = ajv.compile(schema);
+    assert.equal(
+      validate(profile),
+      true,
+      `provider-profile.example.json failed schema validation: ${JSON.stringify(validate.errors, null, 2)}`,
+    );
+    assert.equal(profile.adapter, "rest-v1");
+    assert.equal(
+      "profile" in profile,
+      false,
+      "rest-v1 needs no behavior profile: endpoint + apiKey are the connection",
+    );
+  });
+
+  it("carries no real panel URL and no real API key", () => {
+    const raw = fs.readFileSync(examplePath, "utf8");
+    const profile = JSON.parse(raw) as { endpoint: string; apiKey: string };
+
+    const host = new URL(profile.endpoint).hostname;
+    assert.ok(
+      host === "example" || host.endsWith(".example"),
+      `endpoint host must be a reserved .example host, got ${host}`,
+    );
+    assert.match(profile.apiKey, /^REPLACE_WITH_/);
+    assert.doesNotMatch(raw, /pk_live|sk_live|Bearer\s+\w/i);
   });
 });

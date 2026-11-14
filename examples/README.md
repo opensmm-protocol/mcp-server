@@ -1,4 +1,8 @@
-# Client examples
+# Examples
+
+Runnable clients and copyable reference files for OpenSMM.
+
+## Client examples
 
 Two runnable clients for a running OpenSMM node: catalog, quote, order and an
 idempotent replay of the same order — once over REST, once over MCP. No
@@ -8,7 +12,7 @@ Both work on the node's **mock catalog**. Every service there is marked
 `synthetic: true` and no real order is executed; the scripts refuse to order
 anything that is not marked mock, so nothing here can touch real supply.
 
-## 1. Start a node
+### 1. Start a node
 
 ```bash
 git clone https://github.com/opensmm-protocol/mcp-server.git
@@ -19,7 +23,7 @@ npm run gateway
 
 The node reports its port on stderr (`listening on http://localhost:8080`).
 
-## 2. Order over REST
+### 2. Order over REST
 
 ```bash
 node examples/rest-client.mjs http://127.0.0.1:8080 --client-reference my-first-order
@@ -37,7 +41,7 @@ done:    REST client OK
 
 To not pay anything: the order is created `REQUIRES_PAYMENT` and never settles.
 
-## 3. The same order over MCP
+### 3. The same order over MCP
 
 Copy the `quote:` line printed above — a quote is priced once and consumed once
 — and pass it to the MCP client with the same `clientReference`:
@@ -55,7 +59,7 @@ transport.
 Run without `--quote` and the MCP client prices a new quote itself (useful on
 its own; it cannot reuse an order that was made from a different quote).
 
-## 4. Connect a node to an MCP client (Подключить узел к MCP-клиенту)
+### 4. Connect a node to an MCP client (Подключить узел к MCP-клиенту)
 
 To use your node from Claude Desktop, Cursor, or any MCP-compatible client, add
 one of the following configuration blocks to your client's settings
@@ -65,7 +69,7 @@ The server configuration aligns with [`../mcp.json`](../mcp.json)
 (`io.github.opensmm-protocol/mcp-server`, package `@opensmm/mcp-server`), which
 registers the stdio transport.
 
-### Stdio transport (direct process)
+#### Stdio transport (direct process)
 
 Runs the MCP server locally via `npm run mcp`:
 
@@ -81,7 +85,7 @@ Runs the MCP server locally via `npm run mcp`:
 }
 ```
 
-### HTTP transport (running node)
+#### HTTP transport (running node)
 
 Connects over Streamable HTTP to a running gateway (`npm run gateway` on `:8080`):
 
@@ -95,7 +99,7 @@ Connects over Streamable HTTP to a running gateway (`npm run gateway` on `:8080`
 }
 ```
 
-## What the scripts talk to
+### What the scripts talk to
 
 | Script | Path | Calls |
 | --- | --- | --- |
@@ -105,6 +109,30 @@ Connects over Streamable HTTP to a running gateway (`npm run gateway` on `:8080`
 The MCP client speaks JSON-RPC directly, so it also shows the wire shape an MCP
 SDK hides: one `POST /mcp` per call, `tools/call` with `structuredContent` in the
 answer.
+
+## Provider examples
+
+### `provider-profile.example.json`
+
+A `RegisterProviderRequest` for the `rest-v1` dialect — the payload you send to
+`POST /v0/providers` on your node. It is the file behind «Copy this profile» in
+[`../docs/PROVIDER_ONBOARDING.md`](../docs/PROVIDER_ONBOARDING.md).
+
+Placeholders only:
+
+- `endpoint` — the panel's base URL (its v1 API root). The adapter appends
+  `/services`, `/orders` and `/orders/:id`, so give it the same prefix those
+  paths hang off, e.g. `https://panel.example/api/v1`.
+- `apiKey` — the panel credential, sent as `Authorization: Bearer`. The gateway
+  never returns it, never logs it and never publishes it.
+- `profile` is not set: profiles describe `smm-v2` panel deviations. A
+  `rest-v1` panel needs `endpoint` + `apiKey` and nothing else.
+
+The sample contains no real panel URL and no real key, and `npm test` keeps it
+that way: it is validated against
+`spec/v0/schemas/register-provider-request.json` and asserted to use a
+`.example` host and a placeholder key. Fill a copy **outside** this repository —
+the filled file is a secret.
 
 ## Not shown here
 
