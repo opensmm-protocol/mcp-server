@@ -94,6 +94,8 @@ idempotent replay: [`examples/`](./examples/README.md).
 
 Running a public node? Report its URL for the weekly census via the issue template:
 [`issues/new?template=node-report.md`](https://github.com/opensmm-protocol/mcp-server/issues/new?template=node-report.md).
+Need a public URL without setting up a domain or Caddy first? See
+[`docs/NODES.md` («Public URL without a custom domain»)](./docs/NODES.md#public-url-without-a-custom-domain).
 
 ## The one rule of the protocol
 

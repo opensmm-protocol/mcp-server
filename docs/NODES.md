@@ -40,6 +40,57 @@ Once your node passes locally and is publicly accessible, submit its URL for the
 weekly census via the issue template:
 [`issues/new?template=node-report.md`](https://github.com/opensmm-protocol/mcp-server/issues/new?template=node-report.md).
 
+## Public URL without a custom domain
+
+Census counts only publicly reachable HTTPS/HTTP URLs. If you do not have a
+custom domain or a configured TLS reverse proxy yet, you can expose your local
+gateway through a free Cloudflare quick tunnel without creating an account:
+
+1. Start your gateway locally on port 8080:
+
+```sh
+npm run gateway
+```
+
+2. In another terminal, start the Cloudflare quick tunnel:
+
+```sh
+cloudflared tunnel --url http://127.0.0.1:8080
+```
+
+`cloudflared` prints a temporary `*.trycloudflare.com` URL (allow a few seconds
+for tunnel registration and edge DNS propagation):
+
+```text
++--------------------------------------------------------------------------------------------+
+|  Your quick Tunnel has been created! Visit it at (it may take some time to be reachable):  |
+|  https://gamma-vegetable-sphere-waves.trycloudflare.com                                    |
++--------------------------------------------------------------------------------------------+
+```
+
+3. Verify that the census probes reach your public endpoint:
+
+```sh
+npm run verify:node -- https://gamma-vegetable-sphere-waves.trycloudflare.com
+```
+
+```text
+verify-node: https://gamma-vegetable-sphere-waves.trycloudflare.com
+
+PASS  GET /v0/services — 6 services in the catalog
+PASS  POST /mcp initialize — 2025-06-18, server opensmm
+PASS  GET /v0/providers — 1 provider registered   (informational, not counted)
+
+PASS — the census counts this node: 2/2 required checks passed in 1949 ms
+```
+
+4. Once verified, report your URL for the weekly census via the issue template:
+[`issues/new?template=node-report.md`](https://github.com/opensmm-protocol/mcp-server/issues/new?template=node-report.md).
+
+> Warning: a quick tunnel URL is temporary and changes every time the tunnel
+> process restarts. For a permanent node, set up TLS on your own domain with
+> Caddy as described in [`docs/DEPLOY.md`](./DEPLOY.md#tls--public-endpoint-caddy).
+
 ## Run the census
 
 ```sh

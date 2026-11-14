@@ -150,12 +150,55 @@ describe("bin/opensmm.mjs gateway — a node in one command", () => {
     await stopNode(node);
   });
 
-  it("prints help for `gateway --help` and exits 0", () => {
-    const result = runCli(["gateway", "--help"]);
-    assert.equal(result.status, 0);
-    assert.match(result.stdout, /--port/);
-    assert.match(result.stdout, /--state/);
-    assert.match(result.stdout, /gateway/);
+  it("prints help for `gateway --help` and `-h` and exits 0 with all .env.example variables", () => {
+    const envExamplePath = path.join(REPO_ROOT, ".env.example");
+    const envContent = fs.readFileSync(envExamplePath, "utf8");
+    const envVars = Array.from(envContent.matchAll(/^#?([A-Z][A-Z0-9_]+)=/gm), (m) => m[1]);
+    assert.ok(envVars.length > 0, "must find variables in .env.example");
+
+    for (const flag of ["--help", "-h"]) {
+      const result = runCli(["gateway", flag]);
+      assert.equal(result.status, 0);
+      assert.match(result.stdout, /--port/);
+      assert.match(result.stdout, /--state/);
+      assert.match(result.stdout, /gateway/);
+      assert.match(result.stdout, /\/data\/opensmm-state\.json/);
+
+      for (const envVar of envVars) {
+        assert.ok(
+          result.stdout.includes(envVar),
+          `gateway ${flag} output must document ${envVar} from .env.example`,
+        );
+      }
+    }
+  });
+
+  it("prints help for direct `gateway.ts --help` and `-h` without starting the server", () => {
+    const gatewayScript = path.join(REPO_ROOT, "src", "adapters", "inbound", "gateway.ts");
+    const envExamplePath = path.join(REPO_ROOT, ".env.example");
+    const envContent = fs.readFileSync(envExamplePath, "utf8");
+    const envVars = Array.from(envContent.matchAll(/^#?([A-Z][A-Z0-9_]+)=/gm), (m) => m[1]);
+    assert.ok(envVars.length > 0, "must find variables in .env.example");
+
+    for (const flag of ["--help", "-h"]) {
+      const result = spawnSync(process.execPath, [gatewayScript, flag], {
+        cwd: REPO_ROOT,
+        env: CLEAN_ENV,
+        encoding: "utf8",
+        timeout: 10_000,
+      });
+      assert.equal(result.status, 0);
+      assert.match(result.stdout, /--port/);
+      assert.match(result.stdout, /--state/);
+      assert.match(result.stdout, /\/data\/opensmm-state\.json/);
+
+      for (const envVar of envVars) {
+        assert.ok(
+          result.stdout.includes(envVar),
+          `gateway.ts ${flag} output must document ${envVar} from .env.example`,
+        );
+      }
+    }
   });
 
   it("rejects an unknown subcommand with usage and a non-zero exit", () => {
