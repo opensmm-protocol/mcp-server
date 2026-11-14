@@ -88,6 +88,9 @@ live catalog appears only after you connect a provider (see
 «Connecting a live provider (rest-v1)» below). Independent node checks with
 the census tool: [`docs/NODES.md`](./docs/NODES.md).
 
+How an agent orders from that node, over REST and over MCP, with the
+idempotent replay: [`examples/`](./examples/README.md).
+
 ## The one rule of the protocol
 
 > The same operation through REST and MCP produces the same domain objects.
