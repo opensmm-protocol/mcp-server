@@ -81,7 +81,8 @@ async function main(argv) {
   if (command === "gateway") {
     const options = parseGatewayArgs(rest);
     if (options.help) {
-      console.log(USAGE);
+      const { GATEWAY_HELP } = await loadModule("adapters/inbound/gateway");
+      console.log(GATEWAY_HELP);
       return;
     }
     const { serveGateway } = await loadModule("adapters/inbound/gateway");
