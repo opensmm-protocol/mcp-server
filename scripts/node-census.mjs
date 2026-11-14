@@ -8,6 +8,9 @@
  *
  * Usage: node scripts/node-census.mjs --url http://127.0.0.1:8080 [--url ...]
  *        node scripts/node-census.mjs --file nodes.txt
+ *
+ * `census()` is exported so `scripts/verify-node.mjs` runs the same checks
+ * instead of keeping a second copy of them.
  */
 
 import { readFileSync } from "node:fs";
@@ -22,7 +25,7 @@ const USAGE = `usage: node scripts/node-census.mjs (--url <url> | --file <path>)
 
 class UsageError extends Error {}
 
-function parseUrl(value, source) {
+export function parseUrl(value, source = "url") {
   let url;
   try {
     url = new URL(value);
@@ -123,7 +126,7 @@ function errorText(err) {
   return `${(err && err.message) || String(err)}${cause}`;
 }
 
-async function census(baseUrl) {
+export async function census(baseUrl) {
   const started = Date.now();
   const entry = {
     url: baseUrl,
@@ -133,8 +136,7 @@ async function census(baseUrl) {
     latencyMs: 0,
     status: "down",
   };
-  const errors = [];
-  let servicesOk = false;
+  const checks = [];
 
   // One budget for all three probes, so a dead host costs 5 s, not 15.
   const controller = new AbortController();
@@ -145,15 +147,19 @@ async function census(baseUrl) {
       const { res, body } = await probe("GET", `${baseUrl}/v0/services`, undefined, controller.signal);
       const services = countOf(body, "services");
       if (!res.ok) {
-        errors.push(`GET /v0/services: HTTP ${res.status}`);
+        checks.push({ check: "GET /v0/services", ok: false, detail: `HTTP ${res.status}` });
       } else if (services === null) {
-        errors.push("GET /v0/services: not a JSON catalog");
+        checks.push({ check: "GET /v0/services", ok: false, detail: "not a JSON catalog" });
       } else {
-        servicesOk = true;
         entry.services = services;
+        checks.push({
+          check: "GET /v0/services",
+          ok: true,
+          detail: `${services} ${services === 1 ? "service" : "services"}`,
+        });
       }
     } catch (err) {
-      errors.push(`GET /v0/services: ${errorText(err)}`);
+      checks.push({ check: "GET /v0/services", ok: false, detail: errorText(err) });
     }
 
     try {
@@ -173,15 +179,14 @@ async function census(baseUrl) {
         controller.signal,
       );
       entry.initialize = res.ok && Boolean(body && body.result);
-      if (!entry.initialize) {
-        errors.push(
-          res.ok
-            ? "POST /mcp initialize: not an MCP response"
-            : `POST /mcp initialize: HTTP ${res.status}`,
-        );
-      }
+      const detail = entry.initialize
+        ? "JSON-RPC result"
+        : res.ok
+          ? "not an MCP response"
+          : `HTTP ${res.status}`;
+      checks.push({ check: "POST /mcp initialize", ok: entry.initialize, detail });
     } catch (err) {
-      errors.push(`POST /mcp initialize: ${errorText(err)}`);
+      checks.push({ check: "POST /mcp initialize", ok: false, detail: errorText(err) });
     }
 
     try {
@@ -195,9 +200,12 @@ async function census(baseUrl) {
   }
 
   entry.latencyMs = Date.now() - started;
-  entry.status = servicesOk && entry.initialize ? "up" : "down";
-  if (entry.status === "down" && errors.length > 0) entry.error = errors.join("; ");
-  return entry;
+  entry.status = checks.every((c) => c.ok) ? "up" : "down";
+  if (entry.status === "down") {
+    const failures = checks.filter((c) => !c.ok).map((c) => `${c.check}: ${c.detail}`);
+    if (failures.length > 0) entry.error = failures.join("; ");
+  }
+  return { entry, checks };
 }
 
 function pluralNodes(n) {
@@ -221,7 +229,7 @@ async function main() {
   }
 
   const results = [];
-  for (const url of urls) results.push(await census(url));
+  for (const url of urls) results.push((await census(url)).entry);
 
   const up = results.filter((r) => r.status === "up").length;
   process.stdout.write(`${JSON.stringify(results, null, 2)}\n`);

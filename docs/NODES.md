@@ -11,6 +11,19 @@ A public URL is a node when both checks pass (redirects are not followed):
 
 `GET <url>/v0/providers` is informational: it never decides up or down.
 
+## Check your own node before the census
+
+One command runs the same two checks and prints PASS/FAIL per check:
+
+```sh
+npm run verify:node -- http://127.0.0.1:8080
+```
+
+Exit 0 — the census will count the node. Exit 1 — the node is not counted yet:
+the failing check and its reason are printed, so fix it before announcing the
+node. The checks are the ones from `scripts/node-census.mjs` (imported, not
+copied).
+
 ## Run the census
 
 ```sh
