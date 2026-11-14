@@ -92,6 +92,9 @@ the census tool: [`docs/NODES.md`](./docs/NODES.md).
 How an agent orders from that node, over REST and over MCP, with the
 idempotent replay: [`examples/`](./examples/README.md).
 
+Troubleshooting common startup issues (port conflict, Node version, state file permissions, offline npm ci, mock catalog):
+[`docs/TROUBLESHOOTING.md`](./docs/TROUBLESHOOTING.md).
+
 Running a public node? Report its URL for the weekly census via the issue template:
 [`issues/new?template=node-report.md`](https://github.com/opensmm-protocol/mcp-server/issues/new?template=node-report.md).
 Need a public URL without setting up a domain or Caddy first? See
