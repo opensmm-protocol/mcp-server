@@ -95,78 +95,41 @@ idempotent replay: [`examples/`](./examples/README.md).
 Troubleshooting common startup issues (port conflict, Node version, state file permissions, offline npm ci, mock catalog):
 [`docs/TROUBLESHOOTING.md`](./docs/TROUBLESHOOTING.md).
 
+Running a public node? Report its URL for the weekly census via the issue template:
+[`issues/new?template=node-report.md`](https://github.com/opensmm-protocol/mcp-server/issues/new?template=node-report.md).
+
 ## The one rule of the protocol
 
 > The same operation through REST and MCP produces the same domain objects.
 > Same `clientReference` → same `orderId`, on any transport.
 
-## Install from npm
+## Coming soon
 
-> **Not published yet** — the npm package is tracked in ZHC-303 and does not
-> exist on the registry yet, so this section is not a way to run the node
-> today. Run a node from source (above) — that is the supported entry point.
-> The commands below describe the intended shape once the package is published.
+Two more install routes are planned and **not available yet**:
 
-Requires Node.js ≥ 22.18 — native TypeScript type stripping is on by default
-from that version (Node 22.6–22.17 would need `--experimental-strip-types`,
-so those versions are not supported).
+- npm package `@opensmm/mcp-server` — tracked in ZHC-303;
+- container image `ghcr.io/opensmm-protocol/gateway` — tracked in ZHC-370.
 
-```bash
-npx -y @opensmm/mcp-server
-```
+Both start the same node as the source route above: same REST `/v0`, same MCP
+`/mcp`, same mock catalog. They only remove the checkout step. Until they are
+published, the source route is the only supported way to start a node, so this
+section contains no commands. Operators who need Docker today build the image
+from a checkout — see [`docs/DEPLOY.md`](./docs/DEPLOY.md).
 
-MCP client config (Claude Desktop / Kimi Code / Cursor):
+## Local development
 
-```json
-{
-  "mcpServers": {
-    "opensmm": {
-      "command": "npx",
-      "args": ["-y", "@opensmm/mcp-server"]
-    }
-  }
-}
-```
-
-No API keys are required: without `OPENSMM_*` variables the server starts on
-the built-in MockProvider catalog. Live provider and payment settings are
-opt-in (see below).
-
-## Quick start (local, MockProvider)
-
-Requires Node.js ≥ 22.18 (runs TypeScript natively).
+The checkout also starts single transports, for tests and debugging. To start
+the node itself, use «Run a node from source in 5 minutes» above.
 
 ```bash
 npm install
 npm test          # tests: core, transports, adapters, payments, registry, spec examples
-```
-
-REST:
-
-```bash
-npm run rest      # http://localhost:3100/v0
-curl http://localhost:3100/v0/capabilities
-curl "http://localhost:3100/v0/services?query=members&platform=telegram"
-```
-
-MCP over stdio (local agents) and Streamable HTTP (hosted gateway, e.g. `https://mcp.opensmm.dev/mcp`):
-
-```bash
-npm run mcp         # stdio — point your MCP client at this process
-npm run mcp:http    # http://localhost:3200/mcp — stateless Streamable HTTP, open CORS
-npm run gateway     # http://localhost:8080 — both bindings in one process (deploy shape)
+npm run rest      # http://localhost:3100/v0 — REST only
+npm run mcp       # stdio — point your MCP client at this process
+npm run mcp:http  # http://localhost:3200/mcp — stateless Streamable HTTP, open CORS
 ```
 
 Production deployment (Docker, TLS, state persistence): [`docs/DEPLOY.md`](./docs/DEPLOY.md).
-
-## Run a node in 5 minutes
-
-From a checkout: `npm ci && npm run gateway` starts a complete node — REST
-`/v0` and MCP `/mcp` on one port, no keys — on the mock catalog
-(`"synthetic": true`, not real supply).
-Once the npm package is published (ZHC-303), the same node runs without a
-checkout: `npx -y @opensmm/mcp-server gateway --port 8080`.
-One command, what you see after, state file and flags: [`docs/DEPLOY.md` → Run a node in 5 minutes](./docs/DEPLOY.md#run-a-node-in-5-minutes).
 
 ## Connecting a live provider (rest-v1)
 
@@ -186,8 +149,8 @@ serves it through the same protocol surface. Order creation spends the
 provider-side balance of that API key — use a funded key only when you intend
 to place real orders.
 
-MCP (stdio, for Claude Desktop / Kimi Code / Cursor) — the npm package is
-not published yet (ZHC-303), so until then point the client at a checkout:
+MCP (stdio, for Claude Desktop / Kimi Code / Cursor) — point the client at a
+checkout:
 
 ```json
 {
@@ -202,8 +165,8 @@ not published yet (ZHC-303), so until then point the client at a checkout:
 
 (run `npm run build` once in the checkout — the entry point runs `dist/`,
 because Node refuses TypeScript type stripping inside `node_modules`).
-When the package is published, the same config becomes
-`{"command": "npx", "args": ["-y", "@opensmm/mcp-server"]}`.
+When the npm package is published, the same config works without a checkout —
+see «Coming soon» above.
 
 Tools: `get_capabilities`, `list_providers`, `register_provider`,
 `search_services`, `compare_offers`, `get_service`, `get_quote`, `create_order`,
@@ -371,9 +334,8 @@ Key properties (enforced by tests):
 
 Four entry points, any of them leads to the same server:
 
-- **npm** — `npx -y @opensmm/mcp-server`, no install step and no API key
-  needed (Node.js ≥ 22.18). The package is not published yet (ZHC-303);
-  until it is, run the same node from source: `git clone … && npm ci && npm run gateway`.
+- **npm** — planned, not published yet (ZHC-303, see «Coming soon» above).
+  Until then the same node runs from source: `git clone … && npm ci && npm run gateway`.
 - **MCP Registry** — `io.github.opensmm-protocol/mcp-server`, searchable at
   `https://registry.modelcontextprotocol.io/v0/servers?search=opensmm`.
 - **`llms.txt`** — [`llms.txt`](./llms.txt) is the compact machine-readable
