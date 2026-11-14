@@ -11,6 +11,35 @@ A public URL is a node when both checks pass (redirects are not followed):
 
 `GET <url>/v0/providers` is informational: it never decides up or down.
 
+## Check your own node first
+
+Before the weekly census, run the same two checks locally — PASS/FAIL per
+check, a verdict, exit 0 when the census would count the node and 1 when it
+would not:
+
+```sh
+npm run verify:node -- http://127.0.0.1:8080
+```
+
+```text
+verify-node: http://127.0.0.1:8080
+
+PASS  GET /v0/services — 6 services in the catalog
+PASS  POST /mcp initialize — 2025-06-18, server opensmm
+PASS  GET /v0/providers — 1 provider registered   (informational, not counted)
+
+PASS — the census counts this node: 2/2 required checks passed in 1315 ms
+```
+
+`scripts/verify-node.mjs` imports the probes from `scripts/node-census.mjs`:
+one definition of a node, so a local PASS means the census sees the same node.
+For a node behind a proxy or on a public host, pass the URL the census will
+call (redirects are not followed — use the final URL).
+
+Once your node passes locally and is publicly accessible, submit its URL for the
+weekly census via the issue template:
+[`issues/new?template=node-report.md`](https://github.com/opensmm-protocol/mcp-server/issues/new?template=node-report.md).
+
 ## Run the census
 
 ```sh

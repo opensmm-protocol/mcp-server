@@ -18,15 +18,9 @@ npm ci
 PORT=8080 OPENSMM_STATE_FILE=./opensmm-state.json npm run gateway
 ```
 
-When the npm package is published (ZHC-303), the same node runs without a
-checkout:
-
-```bash
-npx -y @opensmm/mcp-server gateway --port 8080 --state ./opensmm-state.json
-```
-
-`--port` and `--state` override the `PORT` and `OPENSMM_STATE_FILE`
-variables; `--help` lists the flags. Every variable is commented in
+The npm package that starts the same node without a checkout is not published
+yet (ZHC-303, README «Coming soon»), so a checkout is the only route today.
+Every variable is commented in
 `.env.example`. To publish the node to agents, put TLS in front (section
 «TLS + public endpoint (Caddy)» below) and set `OPENSMM_PROVIDER_PAYOUT`,
 so that the orders of this node carry your payout address.
@@ -66,23 +60,14 @@ What you see after the start:
 ## Docker (optional)
 
 The supported Docker route today is a local build from this checkout. The
-prebuilt image in the GitHub Container Registry is still private (ZHC-370),
-so `docker run … ghcr.io/opensmm-protocol/gateway` and `docker compose up`
-from a clean clone do not work yet — the ghcr commands below describe the
-intended shape once the image is public.
+prebuilt image in the GitHub Container Registry is not public yet (ZHC-370,
+README «Coming soon»), so this guide lists no image command to copy.
 
 Build and run from the checkout:
 
 ```bash
 docker build -t opensmm-gateway .
 docker run -d --name opensmm -p 127.0.0.1:8080:8080 -v opensmm-data:/data opensmm-gateway
-```
-
-When the ghcr image becomes public, the same node runs without a build —
-no checkout, no keys:
-
-```bash
-docker run -d --name opensmm -p 127.0.0.1:8080:8080 -v opensmm-data:/data ghcr.io/opensmm-protocol/gateway
 ```
 
 The port binds to loopback only: the node has no TLS and no authentication
@@ -98,10 +83,11 @@ docker run -d --name opensmm -p 127.0.0.1:8080:8080 -v opensmm-data:/data \
   -e OPENSMM_REST_V1_BASE_URL=https://provider.example/api/v1 \
   -e OPENSMM_REST_V1_API_KEY=your-reseller-key \
   -e OPENSMM_PROVIDER_PAYOUT=0xYourUsdcBaseAddress \
-  opensmm-gateway   # or ghcr.io/opensmm-protocol/gateway:latest once the image is public
+  opensmm-gateway
 ```
 
-or `docker compose up -d` once the image is public (see `docker-compose.yml`).
+`docker-compose.yml` already points at the prebuilt image; it works once the
+image is public (ZHC-370, README «Coming soon»).
 
 A node with a live provider that other people can reach must also set the
 payment rail: `-e X402_FACILITATOR_URL=https://x402.org/facilitator -e
