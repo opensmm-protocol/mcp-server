@@ -61,13 +61,25 @@ What you see after the start:
 
 The supported Docker route today is a local build from this checkout. The
 prebuilt image in the GitHub Container Registry is not public yet (ZHC-370,
-README «Coming soon»), so this guide lists no image command to copy.
+README «Coming soon»), so `docker-compose.yml` builds directly from the
+checkout.
 
-Build and run from the checkout:
+Build and start the node with Docker Compose:
 
 ```bash
-docker build -t opensmm-gateway .
-docker run -d --name opensmm -p 127.0.0.1:8080:8080 -v opensmm-data:/data opensmm-gateway
+docker compose up --build -d
+```
+
+(omit `-d` to run in the foreground: `docker compose up --build`).
+
+The gateway builds from the local `Dockerfile`, mounts the named volume
+`opensmm-data` for state (`/data`), and binds port 8080 to loopback
+(`127.0.0.1:8080:8080`).
+
+Verify the node before the weekly census:
+
+```bash
+npm run verify:node -- http://127.0.0.1:8080
 ```
 
 The port binds to loopback only: the node has no TLS and no authentication
@@ -76,7 +88,8 @@ for a public node (section «TLS + public endpoint (Caddy)»).
 
 The node starts on the mock catalog and answers on
 `http://localhost:8080` (`/v0/services`, `/v0/providers`, `/mcp`) within a
-few seconds. Add a live provider and your payout address with `-e`:
+few seconds. Add a live provider and your payout address in an `.env` file or
+with `-e`:
 
 ```bash
 docker run -d --name opensmm -p 127.0.0.1:8080:8080 -v opensmm-data:/data \
@@ -86,8 +99,16 @@ docker run -d --name opensmm -p 127.0.0.1:8080:8080 -v opensmm-data:/data \
   opensmm-gateway
 ```
 
-`docker-compose.yml` already points at the prebuilt image; it works once the
-image is public (ZHC-370, README «Coming soon»).
+Or build and run manually with plain Docker:
+
+```bash
+docker build -t opensmm-gateway .
+docker run -d --name opensmm -p 127.0.0.1:8080:8080 -v opensmm-data:/data opensmm-gateway
+```
+
+`docker-compose.yml` builds the node locally from the checkout (`build: .`).
+Once the prebuilt image is public (ZHC-370, README «Coming soon»), it can be
+switched back to `image: ghcr.io/opensmm-protocol/gateway:latest`.
 
 A node with a live provider that other people can reach must also set the
 payment rail: `-e X402_FACILITATOR_URL=https://x402.org/facilitator -e
