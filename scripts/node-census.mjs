@@ -22,7 +22,7 @@ const USAGE = `usage: node scripts/node-census.mjs (--url <url> | --file <path>)
 
 class UsageError extends Error {}
 
-function parseUrl(value, source) {
+export function parseUrl(value, source) {
   let url;
   try {
     url = new URL(value);
@@ -123,7 +123,18 @@ function errorText(err) {
   return `${(err && err.message) || String(err)}${cause}`;
 }
 
-async function census(baseUrl) {
+function pluralEn(n, one, many) {
+  return `${n} ${n === 1 ? one : many}`;
+}
+
+/**
+ * Probes one node. Returns the census entry plus a per-check report, so callers
+ * that explain a verdict (scripts/verify-node.mjs) use exactly these checks and
+ * never re-implement them.
+ *
+ * @param {string} baseUrl
+ */
+export async function censusNode(baseUrl) {
   const started = Date.now();
   const entry = {
     url: baseUrl,
@@ -133,6 +144,7 @@ async function census(baseUrl) {
     latencyMs: 0,
     status: "down",
   };
+  const checks = [];
   const errors = [];
   let servicesOk = false;
 
@@ -146,14 +158,22 @@ async function census(baseUrl) {
       const services = countOf(body, "services");
       if (!res.ok) {
         errors.push(`GET /v0/services: HTTP ${res.status}`);
+        checks.push({ name: "GET /v0/services", ok: false, detail: `HTTP ${res.status}` });
       } else if (services === null) {
         errors.push("GET /v0/services: not a JSON catalog");
+        checks.push({ name: "GET /v0/services", ok: false, detail: "not a JSON catalog" });
       } else {
         servicesOk = true;
         entry.services = services;
+        checks.push({
+          name: "GET /v0/services",
+          ok: true,
+          detail: `${pluralEn(services, "service", "services")} in the catalog`,
+        });
       }
     } catch (err) {
       errors.push(`GET /v0/services: ${errorText(err)}`);
+      checks.push({ name: "GET /v0/services", ok: false, detail: errorText(err) });
     }
 
     try {
@@ -179,16 +199,33 @@ async function census(baseUrl) {
             ? "POST /mcp initialize: not an MCP response"
             : `POST /mcp initialize: HTTP ${res.status}`,
         );
+        checks.push({
+          name: "POST /mcp initialize",
+          ok: false,
+          detail: res.ok ? "not an MCP response" : `HTTP ${res.status}`,
+        });
+      } else {
+        const result = body.result;
+        const protocol = result.protocolVersion ?? "unknown protocol version";
+        const server = result.serverInfo && result.serverInfo.name ? `, server ${result.serverInfo.name}` : "";
+        checks.push({ name: "POST /mcp initialize", ok: true, detail: `${protocol}${server}` });
       }
     } catch (err) {
       errors.push(`POST /mcp initialize: ${errorText(err)}`);
+      checks.push({ name: "POST /mcp initialize", ok: false, detail: errorText(err) });
     }
 
     try {
       const { res, body } = await probe("GET", `${baseUrl}/v0/providers`, undefined, controller.signal);
       if (res.ok) entry.providers = countOf(body, "providers");
-    } catch {
+      let detail;
+      if (!res.ok) detail = `HTTP ${res.status}`;
+      else if (entry.providers === null) detail = "not a JSON provider list";
+      else detail = `${pluralEn(entry.providers, "provider", "providers")} registered`;
+      checks.push({ name: "GET /v0/providers", ok: res.ok && entry.providers !== null, detail, required: false });
+    } catch (err) {
       // Providers are informational: a node is judged by services + initialize.
+      checks.push({ name: "GET /v0/providers", ok: false, detail: errorText(err), required: false });
     }
   } finally {
     clearTimeout(timer);
@@ -197,7 +234,11 @@ async function census(baseUrl) {
   entry.latencyMs = Date.now() - started;
   entry.status = servicesOk && entry.initialize ? "up" : "down";
   if (entry.status === "down" && errors.length > 0) entry.error = errors.join("; ");
-  return entry;
+  return { entry, checks };
+}
+
+async function census(baseUrl) {
+  return (await censusNode(baseUrl)).entry;
 }
 
 function pluralNodes(n) {

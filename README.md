@@ -80,6 +80,7 @@ curl -s -X POST http://localhost:8080/mcp \
   -H 'content-type: application/json' -H 'accept: application/json, text/event-stream' \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"qa","version":"1"}}}'   # serverInfo.name = "opensmm"
 node scripts/node-census.mjs --url http://127.0.0.1:8080   # "status": "up"
+npm run verify:node -- http://127.0.0.1:8080   # PASS/FAIL per census check; exit 0 = the census counts this node
 ```
 
 The catalog you see is the **mock catalog**: it is not sellable supply and no
