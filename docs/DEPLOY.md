@@ -18,15 +18,9 @@ npm ci
 PORT=8080 OPENSMM_STATE_FILE=./opensmm-state.json npm run gateway
 ```
 
-When the npm package is published (ZHC-303), the same node runs without a
-checkout:
-
-```bash
-npx -y @opensmm/mcp-server gateway --port 8080 --state ./opensmm-state.json
-```
-
-`--port` and `--state` override the `PORT` and `OPENSMM_STATE_FILE`
-variables; `--help` lists the flags. Every variable is commented in
+The npm package that starts the same node without a checkout is not published
+yet (ZHC-303, README «Coming soon»), so a checkout is the only route today.
+Every variable is commented in
 `.env.example`. To publish the node to agents, put TLS in front (section
 «TLS + public endpoint (Caddy)» below) and set `OPENSMM_PROVIDER_PAYOUT`,
 so that the orders of this node carry your payout address.
@@ -43,7 +37,8 @@ Check the node:
 curl -s http://localhost:8080/v0/capabilities   # protocol version, commands
 curl -s http://localhost:8080/v0/services       # served catalog
 curl -s http://localhost:8080/v0/providers      # provider nodes and metrics
-node scripts/node-census.mjs --url http://localhost:8080   # "status": "up"
+npm run census -- --url http://localhost:8080   # "status": "up"
+node scripts/node-census.mjs --url http://localhost:8080   # same check without npm
 ```
 
 What you see after the start:
@@ -63,26 +58,58 @@ What you see after the start:
 - MCP clients connect to `http://localhost:8080/mcp` (Streamable HTTP,
   stateless, open CORS). `tools/list` returns 11 tools.
 
+Troubleshooting common startup issues (port conflict, Node version, state file permissions, offline npm ci, mock catalog):
+[`docs/TROUBLESHOOTING.md`](./TROUBLESHOOTING.md).
+
+## Health check
+
+The node exposes a liveness endpoint for reverse proxies, load balancers and
+container monitors: `GET /health` (also reachable as `GET /v0/health`). It
+answers `200` on the mock catalog, on a live provider and while the catalog is
+still syncing — it reports the process, not the supply.
+
+```bash
+curl -s http://localhost:8080/health
+```
+
+```json
+{
+  "status": "ok",
+  "version": "0.1.0",
+  "uptime": 12.345
+}
+```
+
+`uptime` is the process uptime in seconds. The response is CORS-open
+(`access-control-allow-origin: *`) and `OPTIONS /health` answers `204`, so a
+browser or a dashboard can poll it directly. Use it as the upstream check in
+Caddy/nginx and as the container liveness probe. It reports the process, not
+the supply: the full check — catalog plus MCP `initialize` — stays with
+`npm run verify:node` and `npm run census`.
+
 ## Docker (optional)
 
 The supported Docker route today is a local build from this checkout. The
-prebuilt image in the GitHub Container Registry is still private (ZHC-370),
-so `docker run … ghcr.io/opensmm-protocol/gateway` and `docker compose up`
-from a clean clone do not work yet — the ghcr commands below describe the
-intended shape once the image is public.
+prebuilt image in the GitHub Container Registry is not public yet (ZHC-370,
+README «Coming soon»), so `docker-compose.yml` builds directly from the
+checkout.
 
-Build and run from the checkout:
+Build and start the node with Docker Compose:
 
 ```bash
-docker build -t opensmm-gateway .
-docker run -d --name opensmm -p 127.0.0.1:8080:8080 -v opensmm-data:/data opensmm-gateway
+docker compose up --build -d
 ```
 
-When the ghcr image becomes public, the same node runs without a build —
-no checkout, no keys:
+(omit `-d` to run in the foreground: `docker compose up --build`).
+
+The gateway builds from the local `Dockerfile`, mounts the named volume
+`opensmm-data` for state (`/data`), and binds port 8080 to loopback
+(`127.0.0.1:8080:8080`).
+
+Verify the node before the weekly census:
 
 ```bash
-docker run -d --name opensmm -p 127.0.0.1:8080:8080 -v opensmm-data:/data ghcr.io/opensmm-protocol/gateway
+npm run verify:node -- http://127.0.0.1:8080
 ```
 
 The port binds to loopback only: the node has no TLS and no authentication
@@ -91,17 +118,27 @@ for a public node (section «TLS + public endpoint (Caddy)»).
 
 The node starts on the mock catalog and answers on
 `http://localhost:8080` (`/v0/services`, `/v0/providers`, `/mcp`) within a
-few seconds. Add a live provider and your payout address with `-e`:
+few seconds. Add a live provider and your payout address in an `.env` file or
+with `-e`:
 
 ```bash
 docker run -d --name opensmm -p 127.0.0.1:8080:8080 -v opensmm-data:/data \
   -e OPENSMM_REST_V1_BASE_URL=https://provider.example/api/v1 \
   -e OPENSMM_REST_V1_API_KEY=your-reseller-key \
   -e OPENSMM_PROVIDER_PAYOUT=0xYourUsdcBaseAddress \
-  opensmm-gateway   # or ghcr.io/opensmm-protocol/gateway:latest once the image is public
+  opensmm-gateway
 ```
 
-or `docker compose up -d` once the image is public (see `docker-compose.yml`).
+Or build and run manually with plain Docker:
+
+```bash
+docker build -t opensmm-gateway .
+docker run -d --name opensmm -p 127.0.0.1:8080:8080 -v opensmm-data:/data opensmm-gateway
+```
+
+`docker-compose.yml` builds the node locally from the checkout (`build: .`).
+Once the prebuilt image is public (ZHC-370, README «Coming soon»), it can be
+switched back to `image: ghcr.io/opensmm-protocol/gateway:latest`.
 
 A node with a live provider that other people can reach must also set the
 payment rail: `-e X402_FACILITATOR_URL=https://x402.org/facilitator -e
@@ -120,7 +157,8 @@ same smoke test on every pull request.
 Verify the node with the census tool:
 
 ```bash
-node scripts/node-census.mjs --url http://localhost:8080   # "status": "up"
+npm run census -- --url http://localhost:8080   # "status": "up"
+node scripts/node-census.mjs --url http://localhost:8080   # same check without npm
 ```
 
 The state file (`/data/opensmm-state.json`) contains provider credentials —

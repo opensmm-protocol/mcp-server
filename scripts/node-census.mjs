@@ -12,17 +12,30 @@
 
 import { readFileSync } from "node:fs";
 
-const NODE_BUDGET_MS = 5000;
+const DEFAULT_TIMEOUT_MS = 5000;
+const MIN_TIMEOUT_MS = 1000;
+const MAX_TIMEOUT_MS = 30000;
 const MAX_NODES = 20;
 
-const USAGE = `usage: node scripts/node-census.mjs (--url <url> | --file <path>)...
-  --url <url>    gateway base URL, repeatable
-  --file <path>  file with one URL per line ("#" starts a comment line)
+const USAGE = `usage: node scripts/node-census.mjs (--url <url> | --file <path>)... [--timeout <ms>]
+  --url <url>     gateway base URL, repeatable
+  --file <path>   file with one URL per line ("#" starts a comment line)
+  --timeout <ms>  budget for all probes of one node, ${MIN_TIMEOUT_MS}-${MAX_TIMEOUT_MS} ms (default ${DEFAULT_TIMEOUT_MS})
   max ${MAX_NODES} unique URLs per run; output is JSON on stdout, a summary on stderr`;
 
 class UsageError extends Error {}
 
-function parseUrl(value, source) {
+export function parseTimeout(value, source = "--timeout") {
+  const ms = Number(value);
+  if (!Number.isInteger(ms) || ms < MIN_TIMEOUT_MS || ms > MAX_TIMEOUT_MS) {
+    throw new UsageError(
+      `${source}: expected an integer between ${MIN_TIMEOUT_MS} and ${MAX_TIMEOUT_MS} ms, got "${value}"`,
+    );
+  }
+  return ms;
+}
+
+export function parseUrl(value, source) {
   let url;
   try {
     url = new URL(value);
@@ -43,15 +56,17 @@ function parseUrl(value, source) {
 function parseArgs(argv) {
   const urls = [];
   const files = [];
+  let timeoutMs = DEFAULT_TIMEOUT_MS;
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
-    if (arg === "--url" || arg === "--file") {
+    if (arg === "--url" || arg === "--file" || arg === "--timeout") {
       const value = argv[i + 1];
       if (value === undefined || value.startsWith("--")) {
         throw new UsageError(`${arg} requires a value`);
       }
       if (arg === "--url") urls.push(parseUrl(value, "--url"));
-      else files.push(value);
+      else if (arg === "--file") files.push(value);
+      else timeoutMs = parseTimeout(value);
       i += 1;
     } else if (arg === "--help" || arg === "-h") {
       process.stdout.write(`${USAGE}\n`);
@@ -80,7 +95,7 @@ function parseArgs(argv) {
   if (unique.length > MAX_NODES) {
     throw new UsageError(`${unique.length} unique URLs given; the limit is ${MAX_NODES} per run`);
   }
-  return unique;
+  return { urls: unique, timeoutMs };
 }
 
 async function readBody(res) {
@@ -117,13 +132,27 @@ function countOf(payload, key) {
   return Array.isArray(list) ? list.length : null;
 }
 
-function errorText(err) {
-  if (err && err.name === "AbortError") return `no answer in ${NODE_BUDGET_MS / 1000} s`;
+function errorText(err, timeoutMs) {
+  if (err && err.name === "AbortError") return `no answer in ${timeoutMs / 1000} s`;
   const cause = err && err.cause && err.cause.message ? `: ${err.cause.message}` : "";
   return `${(err && err.message) || String(err)}${cause}`;
 }
 
-async function census(baseUrl) {
+function pluralEn(n, one, many) {
+  return `${n} ${n === 1 ? one : many}`;
+}
+
+/**
+ * Probes one node. Returns the census entry plus a per-check report, so callers
+ * that explain a verdict (scripts/verify-node.mjs) use exactly these checks and
+ * never re-implement them.
+ *
+ * @param {string} baseUrl
+ * @param {{ timeoutMs?: number }} [options]
+ */
+export async function censusNode(baseUrl, options = {}) {
+  const timeoutMs =
+    options.timeoutMs === undefined ? DEFAULT_TIMEOUT_MS : parseTimeout(options.timeoutMs, "timeoutMs");
   const started = Date.now();
   const entry = {
     url: baseUrl,
@@ -133,12 +162,13 @@ async function census(baseUrl) {
     latencyMs: 0,
     status: "down",
   };
+  const checks = [];
   const errors = [];
   let servicesOk = false;
 
-  // One budget for all three probes, so a dead host costs 5 s, not 15.
+  // One budget for all three probes, so a dead host costs one timeout, not three.
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), NODE_BUDGET_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     try {
@@ -146,14 +176,22 @@ async function census(baseUrl) {
       const services = countOf(body, "services");
       if (!res.ok) {
         errors.push(`GET /v0/services: HTTP ${res.status}`);
+        checks.push({ name: "GET /v0/services", ok: false, detail: `HTTP ${res.status}` });
       } else if (services === null) {
         errors.push("GET /v0/services: not a JSON catalog");
+        checks.push({ name: "GET /v0/services", ok: false, detail: "not a JSON catalog" });
       } else {
         servicesOk = true;
         entry.services = services;
+        checks.push({
+          name: "GET /v0/services",
+          ok: true,
+          detail: `${pluralEn(services, "service", "services")} in the catalog`,
+        });
       }
     } catch (err) {
-      errors.push(`GET /v0/services: ${errorText(err)}`);
+      errors.push(`GET /v0/services: ${errorText(err, timeoutMs)}`);
+      checks.push({ name: "GET /v0/services", ok: false, detail: errorText(err, timeoutMs) });
     }
 
     try {
@@ -179,16 +217,33 @@ async function census(baseUrl) {
             ? "POST /mcp initialize: not an MCP response"
             : `POST /mcp initialize: HTTP ${res.status}`,
         );
+        checks.push({
+          name: "POST /mcp initialize",
+          ok: false,
+          detail: res.ok ? "not an MCP response" : `HTTP ${res.status}`,
+        });
+      } else {
+        const result = body.result;
+        const protocol = result.protocolVersion ?? "unknown protocol version";
+        const server = result.serverInfo && result.serverInfo.name ? `, server ${result.serverInfo.name}` : "";
+        checks.push({ name: "POST /mcp initialize", ok: true, detail: `${protocol}${server}` });
       }
     } catch (err) {
-      errors.push(`POST /mcp initialize: ${errorText(err)}`);
+      errors.push(`POST /mcp initialize: ${errorText(err, timeoutMs)}`);
+      checks.push({ name: "POST /mcp initialize", ok: false, detail: errorText(err, timeoutMs) });
     }
 
     try {
       const { res, body } = await probe("GET", `${baseUrl}/v0/providers`, undefined, controller.signal);
       if (res.ok) entry.providers = countOf(body, "providers");
-    } catch {
+      let detail;
+      if (!res.ok) detail = `HTTP ${res.status}`;
+      else if (entry.providers === null) detail = "not a JSON provider list";
+      else detail = `${pluralEn(entry.providers, "provider", "providers")} registered`;
+      checks.push({ name: "GET /v0/providers", ok: res.ok && entry.providers !== null, detail, required: false });
+    } catch (err) {
       // Providers are informational: a node is judged by services + initialize.
+      checks.push({ name: "GET /v0/providers", ok: false, detail: errorText(err, timeoutMs), required: false });
     }
   } finally {
     clearTimeout(timer);
@@ -197,7 +252,11 @@ async function census(baseUrl) {
   entry.latencyMs = Date.now() - started;
   entry.status = servicesOk && entry.initialize ? "up" : "down";
   if (entry.status === "down" && errors.length > 0) entry.error = errors.join("; ");
-  return entry;
+  return { entry, checks };
+}
+
+async function census(baseUrl, timeoutMs) {
+  return (await censusNode(baseUrl, { timeoutMs })).entry;
 }
 
 function pluralNodes(n) {
@@ -210,8 +269,9 @@ function pluralNodes(n) {
 
 async function main() {
   let urls;
+  let timeoutMs;
   try {
-    urls = parseArgs(process.argv.slice(2));
+    ({ urls, timeoutMs } = parseArgs(process.argv.slice(2)));
   } catch (err) {
     if (err instanceof UsageError) {
       process.stderr.write(`node-census: ${err.message}\n${USAGE}\n`);
@@ -221,7 +281,7 @@ async function main() {
   }
 
   const results = [];
-  for (const url of urls) results.push(await census(url));
+  for (const url of urls) results.push(await census(url, timeoutMs));
 
   const up = results.filter((r) => r.status === "up").length;
   process.stdout.write(`${JSON.stringify(results, null, 2)}\n`);

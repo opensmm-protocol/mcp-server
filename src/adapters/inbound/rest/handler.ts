@@ -8,6 +8,8 @@ import { z } from "zod";
 import type { OpenSmmCore } from "../../../core/core.ts";
 import { OpenSmmError, toErrorBody } from "../../../core/errors.ts";
 
+const NODE_VERSION = "0.1.0";
+
 const PLATFORM_VALUES = ["telegram", "instagram", "youtube", "tiktok", "x", "vk", "other"] as const;
 const OBJECTIVE_VALUES = ["followers", "members", "likes", "views", "reactions", "comments", "other"] as const;
 const SORT_VALUES = ["price", "quality", "relevance"] as const;
@@ -88,6 +90,17 @@ export function createRestHandler(
           "access-control-allow-headers": "content-type, idempotency-key",
         });
         res.end();
+        return;
+      }
+
+      // Liveness probe: reverse proxies, load balancers and container runtimes
+      // poll it, so it stays outside /v0 and never touches core state.
+      if (method === "GET" && (path === "/health" || path === "/v0/health")) {
+        sendJson(res, 200, {
+          status: "ok",
+          version: NODE_VERSION,
+          uptime: process.uptime(),
+        });
         return;
       }
 

@@ -184,6 +184,27 @@ describe("REST and MCP are one protocol", () => {
     assert.equal(badQuote.body.error.code, "VALIDATION_FAILED");
   });
 
+  it("health endpoints answer 200 with status and uptime on both paths", async () => {
+    for (const path of ["/health", "/v0/health"]) {
+      const res = await fetch(`${baseUrl}${path}`);
+      assert.equal(res.status, 200);
+      assert.match(res.headers.get("content-type") ?? "", /^application\/json/);
+      assert.equal(res.headers.get("access-control-allow-origin"), "*");
+      const body = (await res.json()) as Record<string, unknown>;
+      assert.equal(body.status, "ok");
+      assert.equal(body.version, "0.1.0");
+      assert.equal(typeof body.uptime, "number");
+    }
+
+    // Browsers and monitoring UIs probe with a preflight first.
+    const preflight = await fetch(`${baseUrl}/health`, {
+      method: "OPTIONS",
+      headers: { origin: "https://opensmm.dev" },
+    });
+    assert.equal(preflight.status, 204);
+    assert.equal(preflight.headers.get("access-control-allow-origin"), "*");
+  });
+
   it("REST answers CORS preflight and marks JSON responses cross-origin readable", async () => {
     const res = await fetch(`${baseUrl}/v0/services`, {
       method: "OPTIONS",

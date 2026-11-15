@@ -150,12 +150,55 @@ describe("bin/opensmm.mjs gateway — a node in one command", () => {
     await stopNode(node);
   });
 
-  it("prints help for `gateway --help` and exits 0", () => {
-    const result = runCli(["gateway", "--help"]);
-    assert.equal(result.status, 0);
-    assert.match(result.stdout, /--port/);
-    assert.match(result.stdout, /--state/);
-    assert.match(result.stdout, /gateway/);
+  it("prints help for `gateway --help` and `-h` and exits 0 with all .env.example variables", () => {
+    const envExamplePath = path.join(REPO_ROOT, ".env.example");
+    const envContent = fs.readFileSync(envExamplePath, "utf8");
+    const envVars = Array.from(envContent.matchAll(/^#?([A-Z][A-Z0-9_]+)=/gm), (m) => m[1]);
+    assert.ok(envVars.length > 0, "must find variables in .env.example");
+
+    for (const flag of ["--help", "-h"]) {
+      const result = runCli(["gateway", flag]);
+      assert.equal(result.status, 0);
+      assert.match(result.stdout, /--port/);
+      assert.match(result.stdout, /--state/);
+      assert.match(result.stdout, /gateway/);
+      assert.match(result.stdout, /\/data\/opensmm-state\.json/);
+
+      for (const envVar of envVars) {
+        assert.ok(
+          result.stdout.includes(envVar),
+          `gateway ${flag} output must document ${envVar} from .env.example`,
+        );
+      }
+    }
+  });
+
+  it("prints help for direct `gateway.ts --help` and `-h` without starting the server", () => {
+    const gatewayScript = path.join(REPO_ROOT, "src", "adapters", "inbound", "gateway.ts");
+    const envExamplePath = path.join(REPO_ROOT, ".env.example");
+    const envContent = fs.readFileSync(envExamplePath, "utf8");
+    const envVars = Array.from(envContent.matchAll(/^#?([A-Z][A-Z0-9_]+)=/gm), (m) => m[1]);
+    assert.ok(envVars.length > 0, "must find variables in .env.example");
+
+    for (const flag of ["--help", "-h"]) {
+      const result = spawnSync(process.execPath, [gatewayScript, flag], {
+        cwd: REPO_ROOT,
+        env: CLEAN_ENV,
+        encoding: "utf8",
+        timeout: 10_000,
+      });
+      assert.equal(result.status, 0);
+      assert.match(result.stdout, /--port/);
+      assert.match(result.stdout, /--state/);
+      assert.match(result.stdout, /\/data\/opensmm-state\.json/);
+
+      for (const envVar of envVars) {
+        assert.ok(
+          result.stdout.includes(envVar),
+          `gateway.ts ${flag} output must document ${envVar} from .env.example`,
+        );
+      }
+    }
   });
 
   it("rejects an unknown subcommand with usage and a non-zero exit", () => {
@@ -309,6 +352,62 @@ describe("bin/opensmm.mjs gateway — a node in one command", () => {
     const viaMcp = await callTool(node, "create_order", body);
     assert.equal(viaMcp.orderId, viaRest.body.orderId);
     assert.deepEqual(viaMcp, viaRest.body);
+  });
+});
+
+describe("bin/opensmm.mjs doctor — panel check in one command", () => {
+  it("prints the doctor usage for `doctor --help` and exits 0", () => {
+    const result = runCli(["doctor", "--help"]);
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /--url/);
+    assert.match(result.stdout, /--key/);
+    assert.match(result.stdout, /--profile/);
+  });
+
+  it("rejects an unknown doctor option with a non-zero exit and no key leak", () => {
+    const result = runCli([
+      "doctor",
+      "--url",
+      "https://panel.example/api/v2",
+      "--key",
+      "doctor-secret-key",
+      "--nope",
+    ]);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Unknown option/);
+    assert.equal(result.stderr.includes("doctor-secret-key"), false);
+  });
+
+  it("keeps the key out of `npm run doctor` output when it comes from the environment", () => {
+    const envKey = "SUPERSECRET-abc123";
+    const result = spawnSync(
+      "npm",
+      ["run", "doctor", "--", "--url", "http://127.0.0.1:1/api/v2"],
+      {
+        cwd: REPO_ROOT,
+        env: { ...CLEAN_ENV, OPENSMM_PANEL_KEY: envKey },
+        encoding: "utf8",
+        timeout: 60_000,
+      },
+    );
+
+    assert.equal(result.status, 1, "an unreachable panel still exits 1");
+    const output = `${result.stdout}${result.stderr}`;
+    assert.match(output, /src\/cli\/provider-doctor\.ts/, "npm echoes the command it runs");
+    assert.equal(
+      output.includes(envKey),
+      false,
+      "the key must not appear in stdout, stderr or the npm command echo",
+    );
+    assert.equal(output.includes("env-file"), false);
+    assert.equal(output.includes(".env not found"), false);
+  });
+
+  it("documents the environment form of the doctor in `--help` and exits 0", () => {
+    const result = runCli(["doctor", "--help"]);
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /OPENSMM_PANEL_KEY/);
+    assert.match(result.stdout, /OPENSMM_PANEL_URL/);
   });
 });
 

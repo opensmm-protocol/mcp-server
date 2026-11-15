@@ -1,0 +1,5 @@
+{
+  "adapter": "rest-v1",
+  "endpoint": "https://panel.example/api/v1",
+  "apiKey": "REPLACE_WITH_YOUR_PANEL_API_KEY"
+}

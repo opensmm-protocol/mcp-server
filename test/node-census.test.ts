@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -11,6 +12,7 @@ import { after, before, describe, it } from "node:test";
 
 const execFileAsync = promisify(execFile);
 const SCRIPT = fileURLToPath(new URL("../scripts/node-census.mjs", import.meta.url));
+const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
 
 type CensusNode = {
   url: string;
@@ -55,6 +57,7 @@ function startMockNode(): Promise<{ server: Server; baseUrl: string }> {
       res.writeHead(200, { "content-type": "text/html" }).end("<html><body>app</body></html>");
       return;
     }
+    if (path.startsWith("/slow/")) return; // never answers: the client timeout decides
     if (req.method === "GET" && path === "/v0/services") {
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify({ services: [{ serviceId: "svc_1" }], catalogVersion: "mock-1" }));
@@ -144,6 +147,30 @@ describe("scripts/node-census.mjs", () => {
     assert.match(stderr, /1 узел: 1 up, 0 down/);
   });
 
+  it("accepts a custom --timeout on a responding node", async () => {
+    const { code, nodes } = await census("--timeout", "10000", "--url", mock.baseUrl);
+    assert.equal(code, 0);
+    assert.equal(nodes[0]!.status, "up");
+  });
+
+  it("applies --timeout to a node that never answers", async () => {
+    const { code, nodes } = await census("--timeout", "1000", "--url", `${mock.baseUrl}/slow`);
+    assert.equal(code, 0);
+    assert.equal(nodes[0]!.status, "down");
+    assert.match(nodes[0]!.error ?? "", /no answer in 1 s/);
+    assert.ok(nodes[0]!.latencyMs >= 900, `latency ${nodes[0]!.latencyMs} ms`);
+    assert.ok(nodes[0]!.latencyMs < 4000, `latency ${nodes[0]!.latencyMs} ms`);
+  });
+
+  it("rejects a --timeout outside 1000-30000 ms", async () => {
+    for (const value of ["abc", "-1", "0", "999", "30001", "1.5"]) {
+      const { code, stderr } = await census("--timeout", value, "--url", mock.baseUrl);
+      assert.equal(code, 1, `--timeout ${value}`);
+      assert.match(stderr, /--timeout: expected an integer between 1000 and 30000 ms, got "/);
+    }
+    assert.equal((await census("--url", mock.baseUrl, "--timeout")).code, 1);
+  });
+
   it("rejects URLs with credentials and does not echo them", async () => {
     const url = mock.baseUrl.replace("http://", "http://user:s3cret@");
     const { code, stdout, stderr } = await census("--url", url);
@@ -170,5 +197,35 @@ describe("scripts/node-census.mjs", () => {
 
     const tooMany = Array.from({ length: 21 }, (_, i) => ["--url", `${mock.baseUrl}/n${i}`]).flat();
     assert.equal((await census(...tooMany)).code, 1);
+  });
+});
+
+async function runNpm(args: string[]): Promise<{ code: number; stdout: string; stderr: string }> {
+  const npm = process.platform === "win32" ? "npm.cmd" : "npm";
+  try {
+    const { stdout, stderr } = await execFileAsync(npm, args, { cwd: REPO_ROOT, encoding: "utf8" });
+    return { code: 0, stdout, stderr };
+  } catch (err) {
+    const failure = err as { code?: number; stdout?: string; stderr?: string };
+    return {
+      code: typeof failure.code === "number" ? failure.code : 1,
+      stdout: failure.stdout ?? "",
+      stderr: failure.stderr ?? "",
+    };
+  }
+}
+
+describe("npm run census", () => {
+  it("is declared in package.json and points at scripts/node-census.mjs", () => {
+    const pkg = JSON.parse(readFileSync(join(REPO_ROOT, "package.json"), "utf8")) as {
+      scripts?: Record<string, string>;
+    };
+    assert.equal(pkg.scripts?.census, "node scripts/node-census.mjs");
+  });
+
+  it("prints usage and exits 0 on --help", async () => {
+    const { code, stdout } = await runNpm(["run", "census", "--", "--help"]);
+    assert.equal(code, 0);
+    assert.match(stdout, /usage: node scripts\/node-census\.mjs \(--url <url> \| --file <path>\)/);
   });
 });

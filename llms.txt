@@ -11,6 +11,7 @@
 - Install: from source — `git clone https://github.com/opensmm-protocol/mcp-server.git && cd mcp-server && npm ci && npm run gateway` (REST /v0 + MCP /mcp on :8080, Node.js >= 22.18, no API key needed). npm package `npx -y @opensmm/mcp-server` — not published yet (ZHC-303). MCP Registry entry: io.github.opensmm-protocol/mcp-server,
   search https://registry.modelcontextprotocol.io/v0/servers?search=opensmm.
   No public remote endpoint yet: run the node locally.
+- Public node without a domain (quick tunnel): expose local node with Cloudflare quick tunnel and verify with `npm run verify:node -- <https-url>` — docs/NODES.md («Public URL without a custom domain»).
 - Protocol version: 0.1.0, URL prefix /v0.
 - One rule: the same operation via REST and MCP yields the same domain
   objects. Same clientReference → same orderId on any transport.
@@ -70,4 +71,6 @@ SUSPENDED providers never appear.
 - JSON Schemas: spec/v0/schemas/
 - Runnable examples: spec/v0/examples/
 - Provider onboarding (incl. a copy-paste AI prompt): docs/PROVIDER_ONBOARDING.md
+- Node census & quick tunnel (no domain): docs/NODES.md
+- Gateway deployment & production TLS (Caddy): docs/DEPLOY.md
 - MCP Registry entry and update procedure: docs/REGISTRY.md

@@ -4,6 +4,7 @@
  *
  *   npx -y @opensmm/mcp-server                  MCP server over stdio (default)
  *   npx -y @opensmm/mcp-server gateway ...      one node: REST /v0 + MCP /mcp
+ *   npx -y @opensmm/mcp-server doctor ...       pre-onboarding panel check
  *
  * Modules come from `dist/` (built by `npm run build`, wired into `prepack`):
  * Node refuses native TypeScript type stripping for files under node_modules,
@@ -18,18 +19,26 @@ const USAGE = `Usage: opensmm [command]
 Commands:
   (none)                 MCP server over stdio (default; keep the old behaviour)
   gateway [options]      One OpenSMM node: REST /v0 and MCP /mcp on one port
+  doctor [options]       Read-only pre-onboarding check of an SMM API v2 panel
 
 Gateway options:
   --port <number>        Listen port (default: PORT, else 8080; 0 picks a free port)
   --state <path>         State snapshot file (default: OPENSMM_STATE_FILE)
   -h, --help             Show this help
 
+Doctor options:
+  --url <url>            Panel API v2 endpoint (default: OPENSMM_PANEL_URL)
+  --key <key>            Panel API key (default: OPENSMM_PANEL_KEY)
+  --profile <name>       Expected profile name (default: standard)
+  -h, --help             Show this help
+
 Examples:
   npx -y @opensmm/mcp-server gateway --port 8080
   npx -y @opensmm/mcp-server gateway --port 8080 --state ./opensmm-state.json
+  OPENSMM_PANEL_KEY=<key> npx -y @opensmm/mcp-server doctor --url https://panel.example/api/v2
 
-No keys and no external services are required: the node boots on the built-in
-mock catalog. Docs: docs/DEPLOY.md («Run a node in 5 minutes»).
+No keys and no external services are required to boot a node: the node boots on
+the built-in mock catalog. Docs: docs/DEPLOY.md («Run a node in 5 minutes»).
 `;
 
 class UsageError extends Error {}
@@ -81,11 +90,17 @@ async function main(argv) {
   if (command === "gateway") {
     const options = parseGatewayArgs(rest);
     if (options.help) {
-      console.log(USAGE);
+      const { GATEWAY_HELP } = await loadModule("adapters/inbound/gateway");
+      console.log(GATEWAY_HELP);
       return;
     }
     const { serveGateway } = await loadModule("adapters/inbound/gateway");
     await serveGateway(options);
+    return;
+  }
+  if (command === "doctor") {
+    const { runDoctorCli } = await loadModule("cli/provider-doctor");
+    process.exitCode = await runDoctorCli(rest);
     return;
   }
   throw new UsageError(`unknown command: ${command}`);

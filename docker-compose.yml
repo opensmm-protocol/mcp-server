@@ -3,8 +3,10 @@
 # State lives on the named volume (orders, metrics, node registrations).
 services:
   gateway:
-    image: ghcr.io/opensmm-protocol/gateway:latest
-    # Local changes only: replace the image with `build: .`.
+    # Source-only build until the prebuilt image is public (ZHC-370).
+    # Once public, replace `build: .` with:
+    # image: ghcr.io/opensmm-protocol/gateway:latest
+    build: .
     restart: unless-stopped
     environment:
       PORT: "8080"

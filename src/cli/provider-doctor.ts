@@ -1,8 +1,14 @@
 /**
  * OpenSMM Provider Doctor (panel pre-onboarding Level-0 check).
  *
- * CLI usage:
- *   node src/cli/provider-doctor.ts --url https://panel.example/api/v2 --key KEY [--profile standard]
+ * CLI usage — the key comes from the environment, so it never lands in argv or
+ * the npm command echo. An inline `VAR=value command` assignment is still
+ * visible in `ps` and the shell history: load a gitignored `.env.panel`
+ * (`set -a; . ./.env.panel; set +a`) or type it without echo
+ * (`read -rs OPENSMM_PANEL_KEY; export OPENSMM_PANEL_KEY`) for that.
+ *   OPENSMM_PANEL_KEY=KEY OPENSMM_PANEL_URL=https://panel.example/api/v2 npm run doctor
+ *   OPENSMM_PANEL_KEY=KEY node bin/opensmm.mjs doctor --url https://panel.example/api/v2
+ *   --url / --key stay available and take priority over the environment.
  *
  * Performs read-only pre-onboarding diagnostics against an SMM API v2 endpoint:
  *   (1) HTTPS reachability + JSON vs HTML/Cloudflare detection
@@ -584,6 +590,17 @@ export function formatDoctorReport(result: DoctorResult): string {
   return lines.join("\n");
 }
 
+/** How an operator is expected to invoke the doctor (npm script or the CLI). */
+export const DOCTOR_USAGE = `Usage: OPENSMM_PANEL_KEY=<key> npm run doctor [--url <url>] [--profile standard]
+       OPENSMM_PANEL_KEY=<key> opensmm doctor [--url <url>] [--profile standard]
+
+The panel key is read from OPENSMM_PANEL_KEY and the endpoint from
+OPENSMM_PANEL_URL, so the key is not part of argv and npm does not echo it.
+An inline OPENSMM_PANEL_KEY=... assignment is still visible in ps and the shell
+history: load a gitignored .env.panel (set -a; . ./.env.panel; set +a) or type
+the key without echo (read -rs OPENSMM_PANEL_KEY; export OPENSMM_PANEL_KEY).
+The --key / --url flags override the environment.`;
+
 /**
  * CLI execution handler.
  */
@@ -628,37 +645,42 @@ export async function runDoctorCli(
     };
   } catch (err: unknown) {
     errFn(`Error: ${err instanceof Error ? err.message : String(err)}`);
-    errFn("Usage: node src/cli/provider-doctor.ts --url <url> --key <key> [--profile standard]");
+    errFn(DOCTOR_USAGE);
     return 1;
   }
 
   const { values } = parsed;
 
   if (values.help) {
-    logFn("Usage: node src/cli/provider-doctor.ts --url <url> --key <key> [--profile standard]");
+    logFn(DOCTOR_USAGE);
     logFn("");
     logFn("Options:");
-    logFn("  --url      Target provider API v2 endpoint (e.g. https://panel.example/api/v2) [required]");
-    logFn("  --key      Provider API key [required]");
+    logFn("  --url      Target provider API v2 endpoint (default: OPENSMM_PANEL_URL)");
+    logFn("  --key      Provider API key (default: OPENSMM_PANEL_KEY; a flag value shows up in npm output)");
     logFn("  --profile  Expected profile name (default: standard)");
     logFn("  -h, --help Show this help message");
     return 0;
   }
 
-  if (!values.url || !values.key) {
-    errFn("Error: Missing required argument. Both --url and --key are required.");
-    errFn("Usage: node src/cli/provider-doctor.ts --url <url> --key <key> [--profile standard]");
+  const url = values.url ?? process.env.OPENSMM_PANEL_URL;
+  const key = values.key ?? process.env.OPENSMM_PANEL_KEY;
+
+  if (!url || !key) {
+    errFn(
+      "Error: Missing required argument: --url/--key or OPENSMM_PANEL_URL/OPENSMM_PANEL_KEY.",
+    );
+    errFn(DOCTOR_USAGE);
     return 1;
   }
 
-  const safeKey = values.key;
+  const safeKey = key;
   const safeLog = (msg: string) => logFn(redactKey(msg, safeKey));
   const safeErr = (msg: string) => errFn(redactKey(msg, safeKey));
 
   try {
     const result = await diagnoseProvider({
-      url: values.url,
-      key: values.key,
+      url,
+      key,
       profile: values.profile,
       fetchImpl,
     });

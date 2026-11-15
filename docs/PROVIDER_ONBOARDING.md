@@ -10,6 +10,23 @@ not write any code. Registration is one call.
 | `smm-v2`  | Classic panel API: `POST {endpoint}` with `key` + `action` (`services`, `add`, `status`, ...). Behavior profiles handle panel deviations. |
 | `rest-v1` | Reseller-style REST: `GET {endpoint}/services`, `POST {endpoint}/orders`, `GET {endpoint}/orders/:id`, Bearer auth. |
 
+## Before you start — check the endpoint (`smm-v2`)
+
+Read-only Level-0 diagnostics: HTTPS and JSON vs HTML/Cloudflare detection,
+`action=balance`, `action=services` with catalog size, envelope and field
+aliases, then a suggested profile and a ready connection snippet. Nothing is
+registered and the API key is never printed.
+
+```bash
+# from a checkout — the key is read from OPENSMM_PANEL_KEY, never from argv
+OPENSMM_PANEL_KEY="<your api key>" npm run doctor -- --url https://your-panel.example/api/v2
+# the same check through the CLI entry point
+OPENSMM_PANEL_KEY="<your api key>" node bin/opensmm.mjs doctor --url https://your-panel.example/api/v2
+```
+
+Exit code `0` — every check passed; `1` — a check failed and the report names
+it. Use the suggested `profile` in the registration call below.
+
 ## Option 1 — paste this prompt into your AI assistant
 
 ```text
@@ -55,6 +72,45 @@ Response:
   "catalogVersion": "2026-11-05T12:00:00.000Z"
 }
 ```
+
+## Copy this profile
+
+[`examples/provider-profile.example.json`](../examples/provider-profile.example.json)
+is a ready-to-edit registration payload for the `rest-v1` dialect. It holds
+placeholders only — `endpoint` (your panel's base URL) and `apiKey` — so it is
+safe to read and impossible to mistake for a live credential. Three steps from
+that file to a registered node:
+
+1. **Copy and fill.** Copy the file outside the repository as `my-panel.json`,
+   replace `endpoint` with your panel's base URL (the adapter appends
+   `/services`, `/orders` and `/orders/:id` to it) and `apiKey` with the
+   panel's key. `smm-v2` panels add `profile` on top of these two; `rest-v1`
+   needs nothing else. The filled file is a secret — keep it out of git and out
+   of chats.
+2. **Check the panel before you hand it over.** The doctor performs the
+   read-only Level-0 checks (HTTPS + JSON, balance, catalog, envelope, field
+   aliases) and prints the `profile` name to use, without ever printing the key:
+
+   ```bash
+   OPENSMM_PANEL_KEY="<your api key>" npm run doctor -- --url https://<your-panel>.example/api/v2
+   OPENSMM_PANEL_KEY="<your api key>" node bin/opensmm.mjs doctor --url https://<your-panel>.example/api/v2
+   ```
+
+   The doctor speaks `smm-v2` only. For `rest-v1` (this sample) the gateway's
+   healthcheck in the next step is the equivalent check: it lists your
+   `GET /services` once and returns `offersCount`.
+3. **Register, then verify the listing.** Post the filled payload to the
+   gateway and read back the pseudonymous key and the offer count:
+
+   ```bash
+   curl -X POST http://localhost:8080/v0/providers \
+     -H 'content-type: application/json' \
+     --data @my-panel.json
+   curl -s http://localhost:8080/v0/providers
+   ```
+
+   A green result is `lifecycle: "UNVERIFIED"` with `offersCount` above zero;
+   your offers are then visible in `GET /v0/services` and `search_services`.
 
 ## What happens under the hood
 
