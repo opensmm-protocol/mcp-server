@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -11,6 +12,7 @@ import { after, before, describe, it } from "node:test";
 
 const execFileAsync = promisify(execFile);
 const SCRIPT = fileURLToPath(new URL("../scripts/node-census.mjs", import.meta.url));
+const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
 
 type CensusNode = {
   url: string;
@@ -170,5 +172,35 @@ describe("scripts/node-census.mjs", () => {
 
     const tooMany = Array.from({ length: 21 }, (_, i) => ["--url", `${mock.baseUrl}/n${i}`]).flat();
     assert.equal((await census(...tooMany)).code, 1);
+  });
+});
+
+async function runNpm(args: string[]): Promise<{ code: number; stdout: string; stderr: string }> {
+  const npm = process.platform === "win32" ? "npm.cmd" : "npm";
+  try {
+    const { stdout, stderr } = await execFileAsync(npm, args, { cwd: REPO_ROOT, encoding: "utf8" });
+    return { code: 0, stdout, stderr };
+  } catch (err) {
+    const failure = err as { code?: number; stdout?: string; stderr?: string };
+    return {
+      code: typeof failure.code === "number" ? failure.code : 1,
+      stdout: failure.stdout ?? "",
+      stderr: failure.stderr ?? "",
+    };
+  }
+}
+
+describe("npm run census", () => {
+  it("is declared in package.json and points at scripts/node-census.mjs", () => {
+    const pkg = JSON.parse(readFileSync(join(REPO_ROOT, "package.json"), "utf8")) as {
+      scripts?: Record<string, string>;
+    };
+    assert.equal(pkg.scripts?.census, "node scripts/node-census.mjs");
+  });
+
+  it("prints usage and exits 0 on --help", async () => {
+    const { code, stdout } = await runNpm(["run", "census", "--", "--help"]);
+    assert.equal(code, 0);
+    assert.match(stdout, /usage: node scripts\/node-census\.mjs \(--url <url> \| --file <path>\)/);
   });
 });

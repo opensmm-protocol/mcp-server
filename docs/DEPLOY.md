@@ -37,7 +37,8 @@ Check the node:
 curl -s http://localhost:8080/v0/capabilities   # protocol version, commands
 curl -s http://localhost:8080/v0/services       # served catalog
 curl -s http://localhost:8080/v0/providers      # provider nodes and metrics
-node scripts/node-census.mjs --url http://localhost:8080   # "status": "up"
+npm run census -- --url http://localhost:8080   # "status": "up"
+node scripts/node-census.mjs --url http://localhost:8080   # same check without npm
 ```
 
 What you see after the start:
@@ -130,7 +131,8 @@ same smoke test on every pull request.
 Verify the node with the census tool:
 
 ```bash
-node scripts/node-census.mjs --url http://localhost:8080   # "status": "up"
+npm run census -- --url http://localhost:8080   # "status": "up"
+node scripts/node-census.mjs --url http://localhost:8080   # same check without npm
 ```
 
 The state file (`/data/opensmm-state.json`) contains provider credentials —

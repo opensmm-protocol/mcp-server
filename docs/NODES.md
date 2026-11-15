@@ -94,13 +94,16 @@ PASS — the census counts this node: 2/2 required checks passed in 1949 ms
 ## Run the census
 
 ```sh
+npm run census -- --url http://127.0.0.1:8080 --url https://mcp.opensmm.dev
+npm run census -- --file nodes.txt   # one URL per line, "#" starts a comment
 node scripts/node-census.mjs --url http://127.0.0.1:8080 --url https://mcp.opensmm.dev
 node scripts/node-census.mjs --file nodes.txt   # one URL per line, "#" starts a comment
 ```
 
 A node started from a checkout (see README, «Run a node from source in 5
 minutes») is checked the same way:
-`node scripts/node-census.mjs --url http://127.0.0.1:8080`.
+`npm run census -- --url http://127.0.0.1:8080`
+(or `node scripts/node-census.mjs --url http://127.0.0.1:8080` without npm).
 
 Limit is 20 URLs per run. Output is JSON on stdout; a summary goes to stderr.
 An unreachable node is data, not a failure: `status: "down"`, exit 0. Exit 1 = broken arguments.
