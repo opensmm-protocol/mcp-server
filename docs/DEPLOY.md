@@ -182,6 +182,28 @@ node scripts/node-census.mjs --url http://localhost:8080   # same check without 
 The state file (`/data/opensmm-state.json`) contains provider credentials —
 it is written with mode `0600`; back it up like a secret.
 
+## systemd service (Linux without Docker)
+
+Without Docker the node is a single process: run it under systemd so it starts
+at boot and restarts after a crash, an OOM kill or a reboot. The ready unit and
+the step-by-step install live in
+[`../examples/systemd/`](../examples/systemd/README.md):
+[`opensmm.service`](../examples/systemd/opensmm.service) (unprivileged user,
+`Restart=always`, `EnvironmentFile=/etc/opensmm/opensmm.env`,
+`StateDirectory=opensmm`) plus the README that sets up the service user, the
+checkout, the environment file, `/var/lib/opensmm` for state and the
+`systemctl enable --now opensmm` command.
+
+The same two checks as everywhere else confirm the service:
+
+```bash
+curl -s http://127.0.0.1:8080/health
+npm run verify:node -- http://127.0.0.1:8080
+```
+
+The unit listens on `0.0.0.0` like every other route — put Caddy in front
+(next section) before the node is reachable from the internet.
+
 ## TLS + public endpoint (Caddy)
 
 For `https://mcp.opensmm.dev`:
