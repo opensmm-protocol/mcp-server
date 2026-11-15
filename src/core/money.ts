@@ -21,6 +21,15 @@ export function formatDecimal(units: bigint): string {
   return `${neg ? "-" : ""}${intPart}.${fracPart}`;
 }
 
+/**
+ * Currency codes are compared in a normalized form (trim + upper): provider
+ * catalogs and curated files disagree on casing, and "usdc" must not become a
+ * second currency next to "USDC".
+ */
+export function normalizeCurrencyCode(code: string): string {
+  return code.trim().toUpperCase();
+}
+
 /** total = rate * quantity / basisDivisor, rounded half-up to micro units. */
 export function quoteAmount(rate: Money, rateBasis: RateBasis, quantity: number): Money {
   if (!Number.isInteger(quantity) || quantity < 1) {

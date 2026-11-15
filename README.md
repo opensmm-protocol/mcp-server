@@ -210,7 +210,8 @@ cheapest offer per provider for a `platform`+`objective`, cheapest first,
 with measured quality and the total price for your `quantity` — SUSPENDED
 providers are excluded. Prices are ranked inside a single currency and never
 converted: `compare_offers` reports the `currency` it ranked in (pass
-`currency` to choose it, default is the most offered one) and lists any other
+`currency` to choose it — codes are matched case-insensitively; the default is
+the most offered currency that can deliver your `quantity`) and lists any other
 currencies in `excludedCurrencies`. `GET /v0/services` supports the same
 `sort` parameter.
 

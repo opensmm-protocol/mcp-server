@@ -156,6 +156,17 @@ describe("REST and MCP are one protocol", () => {
     );
   });
 
+  it("compare_offers rejects a currency code longer than 16 chars (ZHC-416)", async () => {
+    // The catalog caps currency codes at 16 chars (core/curated-catalog.ts); the
+    // MCP schema must reject longer input instead of answering with an empty list.
+    const result: any = await mcpClient.callTool({
+      name: "compare_offers",
+      arguments: { platform: "telegram", objective: "members", currency: "X".repeat(17) },
+    });
+    assert.equal(result.isError, true);
+    assert.match(result.content[0].text, /currency/);
+  });
+
   it("providers are pseudonymous by default and match across transports", async () => {
     const viaRest = await rest("/v0/providers");
     const viaMcp = await mcpCall("list_providers", {});

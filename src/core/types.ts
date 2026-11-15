@@ -274,7 +274,8 @@ export interface OfferComparison {
   /** The requested quantity, when one was given. */
   quantity?: number;
   /**
-   * Currency every offer is priced in. Prices are never converted, so offers in
+   * Currency every offer is priced in (normalized code). Chosen among the offers
+   * that cover the requested quantity. Prices are never converted, so offers in
    * other currencies are left out of the ranking. Absent when nothing matched.
    */
   currency?: string;
