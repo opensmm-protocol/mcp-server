@@ -7,6 +7,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { z } from "zod";
 import type { OpenSmmCore } from "../../../core/core.ts";
 import { OpenSmmError, toErrorBody } from "../../../core/errors.ts";
+import { beginAccessLog } from "../access-log.ts";
 
 const NODE_VERSION = "0.1.0";
 
@@ -46,6 +47,8 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
     "content-length": Buffer.byteLength(payload),
     // Open read API: browser agents and the opensmm.dev site fetch cross-origin.
     "access-control-allow-origin": "*",
+    // Diagnostics: a browser agent reads the request id of a failed call.
+    "access-control-expose-headers": "x-request-id",
   });
   res.end(payload);
 }
@@ -78,6 +81,7 @@ export function createRestHandler(
   core: OpenSmmCore,
 ): (req: IncomingMessage, res: ServerResponse) => Promise<void> {
   return async (req, res) => {
+    beginAccessLog(req, res);
     try {
       const url = new URL(req.url ?? "/", "http://localhost");
       const path = url.pathname.replace(/\/+$/, "") || "/";

@@ -228,6 +228,7 @@ package-only.
 | Variable | Purpose |
 |---|---|
 | `PORT` | Listen port (default 8080). |
+| `OPENSMM_ACCESS_LOG` | `0` turns off the JSON request log on stdout (default on): time, method, path, status, duration and `x-request-id`; no bodies, headers or query. |
 | `OPENSMM_REST_V1_BASE_URL` / `OPENSMM_REST_V1_API_KEY` | Live execution provider. Without them the gateway boots on the in-memory MockProvider (dev only). |
 | `OPENSMM_PROVIDER_PAYOUT` | Direct-settlement payTo address (USDC on Base) published in payment requirements. |
 | `OPENSMM_PROVIDER_LISTED_NAME` | Opt-in public displayName in `list_providers`. |

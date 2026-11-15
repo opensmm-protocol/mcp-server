@@ -8,6 +8,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { OpenSmmCore } from "../../../core/core.ts";
+import { beginAccessLog } from "../access-log.ts";
 import { createMcpServer } from "./server.ts";
 
 const MCP_CORS_HEADERS = "content-type, mcp-protocol-version, mcp-session-id";
@@ -24,10 +25,11 @@ export function createMcpHttpHandler(
   core: OpenSmmCore,
 ): (req: IncomingMessage, res: ServerResponse) => Promise<void> {
   return async (req, res) => {
+    beginAccessLog(req, res);
     res.setHeader("access-control-allow-origin", "*");
     res.setHeader("access-control-allow-methods", "POST, OPTIONS");
     res.setHeader("access-control-allow-headers", MCP_CORS_HEADERS);
-    res.setHeader("access-control-expose-headers", "mcp-session-id");
+    res.setHeader("access-control-expose-headers", "mcp-session-id, x-request-id");
 
     const url = new URL(req.url ?? "/", "http://localhost");
     const path = url.pathname.replace(/\/+$/, "") || "/";
