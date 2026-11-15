@@ -371,18 +371,26 @@ describe("provider-doctor: Level-0 panel pre-onboarding checks", () => {
   });
 
   it("CLI returns exit code 1 when required arguments are missing", async () => {
+    const restore = withEnv({
+      OPENSMM_PANEL_KEY: undefined,
+      OPENSMM_PANEL_URL: undefined,
+    });
     const loggedOutputs: string[] = [];
     const loggedErrors: string[] = [];
 
-    const exitCode = await runDoctorCli(
-      ["--url", "https://panel.example/api/v2"],
-      undefined,
-      (msg) => loggedOutputs.push(msg),
-      (err) => loggedErrors.push(err),
-    );
+    try {
+      const exitCode = await runDoctorCli(
+        ["--url", "https://panel.example/api/v2"],
+        undefined,
+        (msg) => loggedOutputs.push(msg),
+        (err) => loggedErrors.push(err),
+      );
 
-    assert.equal(exitCode, 1);
-    assert.match(loggedErrors.join("\n"), /Missing required argument/i);
+      assert.equal(exitCode, 1);
+      assert.match(loggedErrors.join("\n"), /Missing required argument/i);
+    } finally {
+      restore();
+    }
   });
 
   it("CLI returns exit code 0 on full success", async () => {

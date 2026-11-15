@@ -142,10 +142,15 @@ aliases — plus a suggested profile and a ready connection snippet. Nothing is
 registered and the key is never printed:
 
 ```bash
-# the key is read from OPENSMM_PANEL_KEY: it stays out of argv, npm output and the shell history
+# the key is read from OPENSMM_PANEL_KEY: it stays out of argv and the npm command echo
 OPENSMM_PANEL_KEY=<key> npm run doctor -- --url https://panel.example/api/v2
 OPENSMM_PANEL_KEY=<key> node bin/opensmm.mjs doctor --url https://panel.example/api/v2
 ```
+
+An inline assignment is still visible in `ps` and the shell history. To keep it
+out of both, export the variable from a file
+(`set -a; . ./.panel.env; set +a`, with `.panel.env` gitignored) or set it with
+`read -rs OPENSMM_PANEL_KEY` before the run.
 
 Exit `0` — all checks passed; `1` — a check failed. Details:
 [`docs/PROVIDER_ONBOARDING.md`](./docs/PROVIDER_ONBOARDING.md).

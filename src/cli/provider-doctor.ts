@@ -1,8 +1,9 @@
 /**
  * OpenSMM Provider Doctor (panel pre-onboarding Level-0 check).
  *
- * CLI usage — the key comes from the environment, so it never lands in argv,
- * the npm echo, the shell history or a CI log:
+ * CLI usage — the key comes from the environment, so it never lands in argv or
+ * the npm command echo. An inline `VAR=value command` assignment is still
+ * visible in `ps` and the shell history: use an env file or `read -rs` for that.
  *   OPENSMM_PANEL_KEY=KEY OPENSMM_PANEL_URL=https://panel.example/api/v2 npm run doctor
  *   OPENSMM_PANEL_KEY=KEY node bin/opensmm.mjs doctor --url https://panel.example/api/v2
  *   --url / --key stay available and take priority over the environment.
@@ -592,7 +593,9 @@ export const DOCTOR_USAGE = `Usage: OPENSMM_PANEL_KEY=<key> npm run doctor [--ur
        OPENSMM_PANEL_KEY=<key> opensmm doctor [--url <url>] [--profile standard]
 
 The panel key is read from OPENSMM_PANEL_KEY and the endpoint from
-OPENSMM_PANEL_URL, so neither is echoed by npm or kept in the shell history.
+OPENSMM_PANEL_URL, so the key is not part of argv and npm does not echo it.
+An inline OPENSMM_PANEL_KEY=... assignment is still visible in ps and the shell
+history: export it from an env file or set it with read -rs.
 The --key / --url flags override the environment.`;
 
 /**
