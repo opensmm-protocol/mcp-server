@@ -106,6 +106,24 @@ The gateway builds from the local `Dockerfile`, mounts the named volume
 `opensmm-data` for state (`/data`), and binds port 8080 to loopback
 (`127.0.0.1:8080:8080`).
 
+State goes to `/data/opensmm-state.json` on that volume: `docker-compose.yml`
+sets `OPENSMM_STATE_FILE=/data/opensmm-state.json` in
+`services.gateway.environment`, so orders and metrics survive
+`docker compose restart` and `docker compose down` (the volume stays).
+Without the variable the gateway keeps state in memory only and loses orders
+on every restart.
+
+The compose service declares a `healthcheck` that polls `GET /v0/services`
+inside the container with `node -e` (the runtime image ships no curl/wget).
+`/v0/services` answers only after the catalog is loaded, so `healthy` means
+"ready to take an order", not just "process up" — `/health` covers the
+process check for proxies. Wait for `healthy` before sending traffic:
+
+```bash
+docker compose ps                      # STATUS column shows "healthy"
+docker inspect --format '{{.State.Health.Status}}' $(docker compose ps -q gateway)
+```
+
 Verify the node before the weekly census:
 
 ```bash

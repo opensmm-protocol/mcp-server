@@ -10,6 +10,9 @@ services:
     restart: unless-stopped
     environment:
       PORT: "8080"
+      # State snapshot on the /data volume below: orders and metrics survive
+      # container restarts. Without it the gateway keeps state in memory only.
+      OPENSMM_STATE_FILE: /data/opensmm-state.json
       # Live execution provider (reseller REST v1) — or use an .env file
       # OPENSMM_REST_V1_BASE_URL: https://provider.example/api/v1
       # OPENSMM_REST_V1_API_KEY: change-me
@@ -18,6 +21,20 @@ services:
       - opensmm-data:/data
     ports:
       - "127.0.0.1:8080:8080"
+    # Readiness as `docker compose ps` STATUS "healthy". `node -e` keeps the
+    # check dependency-free: the runtime image ships no curl/wget.
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8080/v0/services').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
 volumes:
   opensmm-data:
