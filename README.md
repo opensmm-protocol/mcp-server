@@ -142,8 +142,9 @@ aliases — plus a suggested profile and a ready connection snippet. Nothing is
 registered and the key is never printed:
 
 ```bash
-npm run doctor -- --url https://panel.example/api/v2 --key <key>
-node bin/opensmm.mjs doctor --url https://panel.example/api/v2 --key <key>
+# the key is read from OPENSMM_PANEL_KEY: it stays out of argv, npm output and the shell history
+OPENSMM_PANEL_KEY=<key> npm run doctor -- --url https://panel.example/api/v2
+OPENSMM_PANEL_KEY=<key> node bin/opensmm.mjs doctor --url https://panel.example/api/v2
 ```
 
 Exit `0` — all checks passed; `1` — a check failed. Details:
