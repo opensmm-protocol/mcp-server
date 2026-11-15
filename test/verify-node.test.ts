@@ -112,4 +112,13 @@ describe("scripts/verify-node.mjs", () => {
     assert.equal(notAUrl.code, 1);
     assert.match(notAUrl.stderr, /not a URL/);
   });
+
+  it("accepts --timeout before or after the URL and rejects a bad value", async () => {
+    assert.equal((await verify("--timeout", "10000", mock.baseUrl)).code, 0);
+    assert.equal((await verify(mock.baseUrl, "--timeout", "10000")).code, 0);
+
+    const bad = await verify("--timeout", "abc", mock.baseUrl);
+    assert.equal(bad.code, 1);
+    assert.match(bad.stderr, /--timeout: expected an integer between 1000 and 30000 ms/);
+  });
 });
