@@ -18,10 +18,10 @@ aliases, then a suggested profile and a ready connection snippet. Nothing is
 registered and the API key is never printed.
 
 ```bash
-# from a checkout
-npm run doctor -- --url https://your-panel.example/api/v2 --key <your api key>
+# from a checkout — the key is read from OPENSMM_PANEL_KEY, never from argv
+OPENSMM_PANEL_KEY="<your api key>" npm run doctor -- --url https://your-panel.example/api/v2
 # the same check through the CLI entry point
-node bin/opensmm.mjs doctor --url https://your-panel.example/api/v2 --key <your api key>
+OPENSMM_PANEL_KEY="<your api key>" node bin/opensmm.mjs doctor --url https://your-panel.example/api/v2
 ```
 
 Exit code `0` — every check passed; `1` — a check failed and the report names
@@ -92,8 +92,8 @@ that file to a registered node:
    aliases) and prints the `profile` name to use, without ever printing the key:
 
    ```bash
-   npm run doctor -- --url https://<your-panel>.example/api/v2 --key "<your api key>"
-   node bin/opensmm.mjs doctor --url https://<your-panel>.example/api/v2 --key "<your api key>"
+   OPENSMM_PANEL_KEY="<your api key>" npm run doctor -- --url https://<your-panel>.example/api/v2
+   OPENSMM_PANEL_KEY="<your api key>" node bin/opensmm.mjs doctor --url https://<your-panel>.example/api/v2
    ```
 
    The doctor speaks `smm-v2` only. For `rest-v1` (this sample) the gateway's

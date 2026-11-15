@@ -371,18 +371,26 @@ describe("provider-doctor: Level-0 panel pre-onboarding checks", () => {
   });
 
   it("CLI returns exit code 1 when required arguments are missing", async () => {
+    const restore = withEnv({
+      OPENSMM_PANEL_KEY: undefined,
+      OPENSMM_PANEL_URL: undefined,
+    });
     const loggedOutputs: string[] = [];
     const loggedErrors: string[] = [];
 
-    const exitCode = await runDoctorCli(
-      ["--url", "https://panel.example/api/v2"],
-      undefined,
-      (msg) => loggedOutputs.push(msg),
-      (err) => loggedErrors.push(err),
-    );
+    try {
+      const exitCode = await runDoctorCli(
+        ["--url", "https://panel.example/api/v2"],
+        undefined,
+        (msg) => loggedOutputs.push(msg),
+        (err) => loggedErrors.push(err),
+      );
 
-    assert.equal(exitCode, 1);
-    assert.match(loggedErrors.join("\n"), /Missing required argument/i);
+      assert.equal(exitCode, 1);
+      assert.match(loggedErrors.join("\n"), /Missing required argument/i);
+    } finally {
+      restore();
+    }
   });
 
   it("CLI returns exit code 0 on full success", async () => {
@@ -418,6 +426,132 @@ describe("provider-doctor: Level-0 panel pre-onboarding checks", () => {
     assert.equal(exitCode, 0);
     assert.match(loggedOutputs.join("\n"), /ALL CHECKS PASSED/);
     assert.equal(loggedOutputs.join("\n").includes("test-key-abc"), false);
+  });
+
+  /** A panel that answers balance and services and records what it received. */
+  function recordingPanel(received: { keys: string[]; urls: string[] }): typeof fetch {
+    return (async (url: string | URL | Request, init?: RequestInit) => {
+      received.urls.push(String(url));
+      const body = new URLSearchParams(String(init?.body ?? ""));
+      received.keys.push(body.get("key") ?? "");
+      const action = body.get("action");
+      if (action === "balance") {
+        return new Response(JSON.stringify({ balance: "10.00", currency: "USD" }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      return new Response(
+        JSON.stringify([{ service: 1, name: "Followers", category: "IG", rate: "1" }]),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    }) as typeof fetch;
+  }
+
+  function withEnv(vars: Record<string, string | undefined>): () => void {
+    const previous = new Map(Object.keys(vars).map((name) => [name, process.env[name]]));
+    for (const [name, value] of Object.entries(vars)) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+    return () => {
+      for (const [name, value] of previous) {
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+      }
+    };
+  }
+
+  it("takes the key and the URL from the environment when the flags are absent", async () => {
+    const envKey = "ENV_ONLY_SECRET_KEY_987654321";
+    const restore = withEnv({
+      OPENSMM_PANEL_KEY: envKey,
+      OPENSMM_PANEL_URL: "https://env-panel.example/api/v2",
+    });
+    const received = { keys: [] as string[], urls: [] as string[] };
+    const loggedOutputs: string[] = [];
+    const loggedErrors: string[] = [];
+
+    try {
+      const exitCode = await runDoctorCli(
+        [],
+        recordingPanel(received),
+        (msg) => loggedOutputs.push(msg),
+        (err) => loggedErrors.push(err),
+      );
+
+      assert.equal(exitCode, 0);
+      assert.ok(received.keys.length > 0, "the doctor must reach the panel");
+      assert.deepEqual(new Set(received.keys), new Set([envKey]));
+      assert.deepEqual(new Set(received.urls), new Set(["https://env-panel.example/api/v2"]));
+
+      const allOutput = loggedOutputs.join("\n") + "\n" + loggedErrors.join("\n");
+      assert.equal(allOutput.includes(envKey), false);
+      assert.match(allOutput, /ALL CHECKS PASSED/);
+    } finally {
+      restore();
+    }
+  });
+
+  it("lets --url and --key override the environment", async () => {
+    const restore = withEnv({
+      OPENSMM_PANEL_KEY: "ENV_KEY_MUST_NOT_WIN_123",
+      OPENSMM_PANEL_URL: "https://env-panel.example/api/v2",
+    });
+    const received = { keys: [] as string[], urls: [] as string[] };
+    const loggedOutputs: string[] = [];
+    const loggedErrors: string[] = [];
+
+    try {
+      const exitCode = await runDoctorCli(
+        [
+          "--url",
+          "https://flag-panel.example/api/v2",
+          "--key",
+          "FLAG_KEY_WINS_456",
+        ],
+        recordingPanel(received),
+        (msg) => loggedOutputs.push(msg),
+        (err) => loggedErrors.push(err),
+      );
+
+      assert.equal(exitCode, 0);
+      assert.deepEqual(new Set(received.keys), new Set(["FLAG_KEY_WINS_456"]));
+      assert.deepEqual(new Set(received.urls), new Set(["https://flag-panel.example/api/v2"]));
+
+      const allOutput = loggedOutputs.join("\n") + "\n" + loggedErrors.join("\n");
+      assert.equal(allOutput.includes("FLAG_KEY_WINS_456"), false);
+      assert.equal(allOutput.includes("ENV_KEY_MUST_NOT_WIN_123"), false);
+    } finally {
+      restore();
+    }
+  });
+
+  it("returns exit code 1 and names both sources when there is no flag and no environment", async () => {
+    const restore = withEnv({
+      OPENSMM_PANEL_KEY: undefined,
+      OPENSMM_PANEL_URL: undefined,
+    });
+    const loggedOutputs: string[] = [];
+    const loggedErrors: string[] = [];
+
+    try {
+      const exitCode = await runDoctorCli(
+        [],
+        recordingPanel({ keys: [], urls: [] }),
+        (msg) => loggedOutputs.push(msg),
+        (err) => loggedErrors.push(err),
+      );
+
+      assert.equal(exitCode, 1);
+      const errors = loggedErrors.join("\n");
+      assert.match(errors, /Missing required argument/i);
+      assert.match(errors, /--key/);
+      assert.match(errors, /OPENSMM_PANEL_KEY/);
+      assert.equal(loggedOutputs.join("\n").includes("ALL CHECKS PASSED"), false);
+    } finally {
+      restore();
+    }
   });
 });
 

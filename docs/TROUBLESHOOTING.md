@@ -319,8 +319,9 @@ export OPENSMM_REST_V1_API_KEY="your-api-key"
 npm run gateway
 ```
 
-For SMM API v2 panels, use the pre-onboarding diagnostic tool first:
+For SMM API v2 panels, use the pre-onboarding diagnostic tool first
+(the key comes from `OPENSMM_PANEL_KEY`, so it stays out of argv and the npm command echo):
 ```bash
-npm run doctor -- --url https://panel.example/api/v2 --key YOUR_KEY
-node bin/opensmm.mjs doctor --url https://panel.example/api/v2 --key YOUR_KEY
+OPENSMM_PANEL_KEY="YOUR_KEY" npm run doctor -- --url https://panel.example/api/v2
+OPENSMM_PANEL_KEY="YOUR_KEY" node bin/opensmm.mjs doctor --url https://panel.example/api/v2
 ```

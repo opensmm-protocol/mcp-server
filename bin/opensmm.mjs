@@ -27,15 +27,15 @@ Gateway options:
   -h, --help             Show this help
 
 Doctor options:
-  --url <url>            Panel API v2 endpoint (e.g. https://panel.example/api/v2) [required]
-  --key <key>            Panel API key [required]
+  --url <url>            Panel API v2 endpoint (default: OPENSMM_PANEL_URL)
+  --key <key>            Panel API key (default: OPENSMM_PANEL_KEY)
   --profile <name>       Expected profile name (default: standard)
   -h, --help             Show this help
 
 Examples:
   npx -y @opensmm/mcp-server gateway --port 8080
   npx -y @opensmm/mcp-server gateway --port 8080 --state ./opensmm-state.json
-  npx -y @opensmm/mcp-server doctor --url https://panel.example/api/v2 --key <key>
+  OPENSMM_PANEL_KEY=<key> npx -y @opensmm/mcp-server doctor --url https://panel.example/api/v2
 
 No keys and no external services are required to boot a node: the node boots on
 the built-in mock catalog. Docs: docs/DEPLOY.md («Run a node in 5 minutes»).

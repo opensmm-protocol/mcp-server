@@ -142,9 +142,15 @@ aliases — plus a suggested profile and a ready connection snippet. Nothing is
 registered and the key is never printed:
 
 ```bash
-npm run doctor -- --url https://panel.example/api/v2 --key <key>
-node bin/opensmm.mjs doctor --url https://panel.example/api/v2 --key <key>
+# the key is read from OPENSMM_PANEL_KEY: it stays out of argv and the npm command echo
+OPENSMM_PANEL_KEY=<key> npm run doctor -- --url https://panel.example/api/v2
+OPENSMM_PANEL_KEY=<key> node bin/opensmm.mjs doctor --url https://panel.example/api/v2
 ```
+
+An inline assignment is still visible in `ps` and the shell history. To keep it
+out of both, put the key in `.env.panel` (gitignored by the `.env.*` rule) and
+load it with `set -a; . ./.env.panel; set +a`, or type it without echo:
+`read -rs OPENSMM_PANEL_KEY; export OPENSMM_PANEL_KEY`.
 
 Exit `0` — all checks passed; `1` — a check failed. Details:
 [`docs/PROVIDER_ONBOARDING.md`](./docs/PROVIDER_ONBOARDING.md).

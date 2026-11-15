@@ -377,6 +377,38 @@ describe("bin/opensmm.mjs doctor — panel check in one command", () => {
     assert.match(result.stderr, /Unknown option/);
     assert.equal(result.stderr.includes("doctor-secret-key"), false);
   });
+
+  it("keeps the key out of `npm run doctor` output when it comes from the environment", () => {
+    const envKey = "SUPERSECRET-abc123";
+    const result = spawnSync(
+      "npm",
+      ["run", "doctor", "--", "--url", "http://127.0.0.1:1/api/v2"],
+      {
+        cwd: REPO_ROOT,
+        env: { ...CLEAN_ENV, OPENSMM_PANEL_KEY: envKey },
+        encoding: "utf8",
+        timeout: 60_000,
+      },
+    );
+
+    assert.equal(result.status, 1, "an unreachable panel still exits 1");
+    const output = `${result.stdout}${result.stderr}`;
+    assert.match(output, /src\/cli\/provider-doctor\.ts/, "npm echoes the command it runs");
+    assert.equal(
+      output.includes(envKey),
+      false,
+      "the key must not appear in stdout, stderr or the npm command echo",
+    );
+    assert.equal(output.includes("env-file"), false);
+    assert.equal(output.includes(".env not found"), false);
+  });
+
+  it("documents the environment form of the doctor in `--help` and exits 0", () => {
+    const result = runCli(["doctor", "--help"]);
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /OPENSMM_PANEL_KEY/);
+    assert.match(result.stdout, /OPENSMM_PANEL_URL/);
+  });
 });
 
 describe("bin/opensmm.mjs gateway --state", () => {
