@@ -114,6 +114,16 @@ describe("curated public catalog", () => {
     }
   });
 
+  it("normalizes currency codes at ingest (ZHC-416)", () => {
+    const file = stubFile();
+    file.entries[0].service.rate.currency = " usdc ";
+    const parsed = parseCuratedCatalog(file, "fixture");
+    assert.deepEqual(parsed.entries[0]!.service.rate, {
+      value: file.entries[0].service.rate.value,
+      currency: "USDC",
+    });
+  });
+
   it("rejects a duplicate serviceId", () => {
     const file = stubFile();
     file.entries[1].service.serviceId = file.entries[0].service.serviceId;

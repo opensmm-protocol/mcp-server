@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { MockProvider } from "../src/adapters/providers/mock/index.ts";
+import { providerOfferToCatalogEntry } from "../src/core/catalog-map.ts";
 import type { CatalogEntry } from "../src/core/catalog.ts";
 import { InMemoryCatalog } from "../src/core/catalog.ts";
 import { OpenSmmCore } from "../src/core/core.ts";
@@ -298,5 +299,134 @@ describe("compare_offers currency handling", () => {
     assert.equal(result.currency, "GBP");
     assert.deepEqual(result.excludedCurrencies, ["EUR", "USDC"]);
     assert.equal(result.offers.length, 0);
+  });
+
+  it("default currency is chosen among offers that cover the quantity (ZHC-416)", () => {
+    // 2x EUR capped at 50000, 1x USDC capped at 200000; quantity 60000 only fits USDC.
+    const catalog = new InMemoryCatalog(
+      [
+        makeEntry(
+          "mock",
+          makeService("osmm_svc_tg_likes_eur_a", "1.000000", {
+            objective: "likes",
+            rate: { value: "1.000000", currency: "EUR" },
+            maxQuantity: 50000,
+          }),
+          "1001",
+        ),
+        makeEntry(
+          "mock-2",
+          makeService("osmm_svc_tg_likes_eur_b", "1.100000", {
+            objective: "likes",
+            rate: { value: "1.100000", currency: "EUR" },
+            maxQuantity: 50000,
+          }),
+          "2001",
+        ),
+        makeEntry(
+          "mock-2",
+          makeService("osmm_svc_tg_likes_usdc", "2.000000", {
+            objective: "likes",
+            maxQuantity: 200000,
+          }),
+          "2002",
+        ),
+      ],
+      "2026-11-08T00:00:00Z",
+    );
+    const core = new OpenSmmCore({
+      catalog,
+      providers: [new MockProvider(), new StubProvider("mock-2")],
+    });
+
+    const result = core.compareOffers({
+      platform: "telegram",
+      objective: "likes",
+      quantity: 60000,
+    });
+    assert.equal(result.currency, "USDC");
+    assert.deepEqual(result.excludedCurrencies, ["EUR"]);
+    assert.deepEqual(
+      result.offers.map((o) => [o.providerRef, o.serviceId, o.total.currency]),
+      [["provider-beta", "osmm_svc_tg_likes_usdc", "USDC"]],
+    );
+  });
+
+  it("currency code is matched case-insensitively (ZHC-416)", () => {
+    const core = createMixedCurrencyCore();
+    const result = core.compareOffers({
+      platform: "telegram",
+      objective: "members",
+      quantity: 1000,
+      currency: "usdc",
+    });
+    assert.equal(result.currency, "USDC");
+    assert.deepEqual(result.excludedCurrencies, ["EUR"]);
+    assert.deepEqual(
+      result.offers.map((o) => [o.providerRef, o.total.value, o.total.currency]),
+      [
+        ["provider-alpha", "2.400000", "USDC"],
+        ["provider-beta", "3.000000", "USDC"],
+      ],
+    );
+  });
+
+  it("catalog codes differing only in case are one currency, not two (ZHC-416)", () => {
+    // Provider ingest does not normalize casing; both offers are USD Cents at heart:
+    // USDC 2.0 (mock) and usdc 1.0 (mock-2) must be ranked together, cheapest first.
+    const catalog = new InMemoryCatalog(
+      [
+        makeEntry("mock", makeService("osmm_svc_tg_members_usdc", "2.000000"), "1001"),
+        makeEntry(
+          "mock-2",
+          makeService("osmm_svc_tg_members_usdc_lc", "1.000000", {
+            rate: { value: "1.000000", currency: "usdc" },
+          }),
+          "2001",
+        ),
+      ],
+      "2026-11-08T00:00:00Z",
+    );
+    const core = new OpenSmmCore({
+      catalog,
+      providers: [new MockProvider(), new StubProvider("mock-2")],
+    });
+
+    const result = core.compareOffers({
+      platform: "telegram",
+      objective: "members",
+      quantity: 1000,
+    });
+    assert.equal(result.currency, "USDC");
+    assert.equal(result.excludedCurrencies, undefined);
+    assert.deepEqual(
+      result.offers.map((o) => [o.providerRef, o.total.value, o.total.currency]),
+      [
+        ["provider-beta", "1.000000", "USDC"],
+        ["provider-alpha", "2.000000", "USDC"],
+      ],
+    );
+  });
+});
+
+describe("provider catalog ingest", () => {
+  it("currency code is normalized (trim + upper) when offers enter the catalog (ZHC-416)", () => {
+    const entry = providerOfferToCatalogEntry(
+      {
+        externalServiceId: "1001",
+        name: "Telegram members",
+        category: "Telegram",
+        rate: "1.000000",
+        currency: " usdc ",
+        rateBasis: "PER_1000",
+        minQuantity: 100,
+        maxQuantity: 50000,
+        refill: false,
+        cancel: false,
+        dripfeed: false,
+      },
+      "panel",
+    );
+    assert.deepEqual(entry.service.rate, { value: "1.000000", currency: "USDC" });
   });
 });
