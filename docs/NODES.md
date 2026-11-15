@@ -36,6 +36,65 @@ one definition of a node, so a local PASS means the census sees the same node.
 For a node behind a proxy or on a public host, pass the URL the census will
 call (redirects are not followed — use the final URL).
 
+### Machine-readable output for monitoring
+
+Add `--json` to print the same result as JSON on stdout instead of the
+human-readable report — for a cron job or a CI step that alerts on a down node:
+
+```sh
+npm run verify:node -- --json http://127.0.0.1:8080
+```
+
+The script prints only this JSON on stdout; `npm run` itself echoes the command
+it runs above it, so a pipeline uses the `--silent` form or the direct `node`
+call shown further down:
+
+```json
+{
+  "entry": {
+    "url": "http://127.0.0.1:8080",
+    "services": 6,
+    "providers": 1,
+    "initialize": true,
+    "latencyMs": 1315,
+    "status": "up"
+  },
+  "checks": [
+    { "name": "GET /v0/services", "ok": true, "detail": "6 services in the catalog" },
+    { "name": "POST /mcp initialize", "ok": true, "detail": "2025-06-18, server opensmm" },
+    {
+      "name": "GET /v0/providers",
+      "ok": true,
+      "detail": "1 provider registered",
+      "required": false
+    }
+  ]
+}
+```
+
+`entry` is the census entry (`status` is `"up"` or `"down"`, `entry.error`
+explains a down node); `checks` is the per-check report, where
+`required: false` marks a check that never decides the verdict. Exit codes are
+unchanged: 0 when the census would count the node, 1 when it would not or the
+arguments are broken.
+
+`--json` prints nothing else on stdout, but `npm run` echoes the command it
+runs, and those `> ...` lines land on stdout and break a parser. Put npm's
+`--silent` before the command, or call the script directly, when the output goes
+into `jq` or a monitoring agent:
+
+```sh
+npm --silent run verify:node -- --json <url> | jq .entry.status
+node scripts/verify-node.mjs --json <url> | jq .entry.status
+```
+
+A daily cron check that reports a down node through its exit code:
+
+```sh
+npm --silent run verify:node -- --json https://mcp.example.org > /var/log/opensmm-verify.json \
+  || echo "OpenSMM node is down" >&2
+```
+
 Once your node passes locally and is publicly accessible, submit its URL for the
 weekly census via the issue template:
 [`issues/new?template=node-report.md`](https://github.com/opensmm-protocol/mcp-server/issues/new?template=node-report.md).

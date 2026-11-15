@@ -7,11 +7,19 @@ import { promisify } from "node:util";
 import { after, before, describe, it } from "node:test";
 
 const execFileAsync = promisify(execFile);
+const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
 const SCRIPT = fileURLToPath(new URL("../scripts/verify-node.mjs", import.meta.url));
 
-async function verify(...args: string[]): Promise<{ code: number; stdout: string; stderr: string }> {
+async function run(
+  file: string,
+  args: string[],
+  cwd?: string,
+): Promise<{ code: number; stdout: string; stderr: string }> {
   try {
-    const { stdout, stderr } = await execFileAsync(process.execPath, [SCRIPT, ...args]);
+    const { stdout, stderr } = await execFileAsync(file, args, {
+      encoding: "utf8",
+      ...(cwd === undefined ? {} : { cwd }),
+    });
     return { code: 0, stdout, stderr };
   } catch (err) {
     const failure = err as { code?: number; stdout?: string; stderr?: string };
@@ -21,6 +29,14 @@ async function verify(...args: string[]): Promise<{ code: number; stdout: string
       stderr: failure.stderr ?? "",
     };
   }
+}
+
+function verify(...args: string[]): Promise<{ code: number; stdout: string; stderr: string }> {
+  return run(process.execPath, [SCRIPT, ...args]);
+}
+
+function verifyViaNpm(...args: string[]): Promise<{ code: number; stdout: string; stderr: string }> {
+  return run("npm", ["--silent", "run", "verify:node", "--", ...args], REPO_ROOT);
 }
 
 function startMockNode(options: { providers?: boolean } = {}): Promise<{ server: Server; baseUrl: string }> {
@@ -120,5 +136,75 @@ describe("scripts/verify-node.mjs", () => {
     const bad = await verify("--timeout", "abc", mock.baseUrl);
     assert.equal(bad.code, 1);
     assert.match(bad.stderr, /--timeout: expected an integer between 1000 and 30000 ms/);
+  });
+
+  it("prints { entry, checks } as JSON with --json on an up node, exit 0", async () => {
+    const { code, stdout } = await verify("--json", mock.baseUrl);
+    assert.equal(code, 0);
+
+    const parsed = JSON.parse(stdout) as {
+      entry: Record<string, unknown>;
+      checks: Array<Record<string, unknown>>;
+    };
+    assert.deepEqual(Object.keys(parsed).sort(), ["checks", "entry"]);
+    assert.equal(parsed.entry.url, mock.baseUrl);
+    assert.equal(parsed.entry.status, "up");
+    assert.equal(parsed.entry.services, 1);
+    assert.equal(parsed.entry.providers, 1);
+    assert.equal(parsed.entry.initialize, true);
+    assert.equal(typeof parsed.entry.latencyMs, "number");
+    assert.equal(parsed.entry.error, undefined);
+
+    assert.deepEqual(
+      parsed.checks.map((check) => [check.name, check.ok, check.required]),
+      [
+        ["GET /v0/services", true, undefined],
+        ["POST /mcp initialize", true, undefined],
+        ["GET /v0/providers", true, false],
+      ],
+    );
+    assert.equal(typeof parsed.checks[0].detail, "string");
+    assert.doesNotMatch(stdout, /^PASS {2}GET /m);
+  });
+
+  it("prints JSON with entry.status down and exit 1 with --json on a closed port", async () => {
+    const { server, baseUrl } = await startMockNode();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+
+    const { code, stdout } = await verify("--json", baseUrl);
+    assert.equal(code, 1);
+
+    const parsed = JSON.parse(stdout) as {
+      entry: { status: string; error?: string };
+      checks: Array<{ name: string; ok: boolean; required?: boolean }>;
+    };
+    assert.equal(parsed.entry.status, "down");
+    assert.match(parsed.entry.error ?? "", /GET \/v0\/services|POST \/mcp initialize/);
+    assert.deepEqual(
+      parsed.checks.map((check) => [check.name, check.ok, check.required]),
+      [
+        ["GET /v0/services", false, undefined],
+        ["POST /mcp initialize", false, undefined],
+        ["GET /v0/providers", false, false],
+      ],
+    );
+  });
+
+  it("accepts --json before or after the URL and still rejects broken arguments", async () => {
+    assert.equal((await verify(mock.baseUrl, "--json")).code, 0);
+
+    const noUrl = await verify("--json");
+    assert.equal(noUrl.code, 1);
+    assert.equal(noUrl.stdout, "");
+    assert.match(noUrl.stderr, /no URL given/);
+  });
+
+  it("keeps `npm --silent run verify:node -- --json` stdout pure JSON", async () => {
+    const { code, stdout } = await verifyViaNpm("--json", mock.baseUrl);
+
+    assert.equal(code, 0);
+    const parsed = JSON.parse(stdout) as { entry: { status: string }; checks: unknown[] };
+    assert.equal(parsed.entry.status, "up");
+    assert.equal(parsed.checks.length, 3);
   });
 });
