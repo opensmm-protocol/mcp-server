@@ -92,7 +92,8 @@ that file to a registered node:
    aliases) and prints the `profile` name to use, without ever printing the key:
 
    ```bash
-   node src/cli/provider-doctor.ts --url https://<your-panel>.example/api/v2 --key "<your api key>"
+   npm run doctor -- --url https://<your-panel>.example/api/v2 --key "<your api key>"
+   node bin/opensmm.mjs doctor --url https://<your-panel>.example/api/v2 --key "<your api key>"
    ```
 
    The doctor speaks `smm-v2` only. For `rest-v1` (this sample) the gateway's
