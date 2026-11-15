@@ -3,7 +3,9 @@
  *
  * CLI usage — the key comes from the environment, so it never lands in argv or
  * the npm command echo. An inline `VAR=value command` assignment is still
- * visible in `ps` and the shell history: use an env file or `read -rs` for that.
+ * visible in `ps` and the shell history: load a gitignored `.env.panel`
+ * (`set -a; . ./.env.panel; set +a`) or type it without echo
+ * (`read -rs OPENSMM_PANEL_KEY; export OPENSMM_PANEL_KEY`) for that.
  *   OPENSMM_PANEL_KEY=KEY OPENSMM_PANEL_URL=https://panel.example/api/v2 npm run doctor
  *   OPENSMM_PANEL_KEY=KEY node bin/opensmm.mjs doctor --url https://panel.example/api/v2
  *   --url / --key stay available and take priority over the environment.
@@ -595,7 +597,8 @@ export const DOCTOR_USAGE = `Usage: OPENSMM_PANEL_KEY=<key> npm run doctor [--ur
 The panel key is read from OPENSMM_PANEL_KEY and the endpoint from
 OPENSMM_PANEL_URL, so the key is not part of argv and npm does not echo it.
 An inline OPENSMM_PANEL_KEY=... assignment is still visible in ps and the shell
-history: export it from an env file or set it with read -rs.
+history: load a gitignored .env.panel (set -a; . ./.env.panel; set +a) or type
+the key without echo (read -rs OPENSMM_PANEL_KEY; export OPENSMM_PANEL_KEY).
 The --key / --url flags override the environment.`;
 
 /**
