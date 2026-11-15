@@ -4,11 +4,13 @@ Runnable clients and copyable reference files for OpenSMM.
 
 ## Client examples
 
-Two runnable clients for a running OpenSMM node: catalog, quote, order and an
-idempotent replay of the same order — once over REST, once over MCP. No
-dependencies, no MCP SDK, no API keys, no money: Node.js ≥ 22.18 and `fetch`.
+Three runnable clients for a running OpenSMM node: catalog, quote, order and an
+idempotent replay of the same order — over REST in Node.js, over REST in Python
+and over MCP. No dependencies, no MCP SDK, no API keys, no money: Node.js ≥
+22.18 with `fetch`, and Python 3.8+ with `urllib.request` from the standard
+library.
 
-Both work on the node's **mock catalog**. Every service there is marked
+All three work on the node's **mock catalog**. Every service there is marked
 `synthetic: true` and no real order is executed; the scripts refuse to order
 anything that is not marked mock, so nothing here can touch real supply.
 
@@ -41,7 +43,34 @@ done:    REST client OK
 
 To not pay anything: the order is created `REQUIRES_PAYMENT` and never settles.
 
-### 3. The same order over MCP
+### 3. The same REST walkthrough in Python
+
+`examples/rest-client.py` makes the same calls as the Node.js REST client with
+the Python standard library only — `urllib.request` and `json`, no `pip
+install`, no SDK:
+
+```bash
+python3 examples/rest-client.py http://127.0.0.1:8080 --client-reference my-first-order
+```
+
+```
+node:    http://127.0.0.1:8080
+protocol: 0.1.0 - 10 commands, payment: mock
+catalog: MOCK - every service is marked synthetic: not real supply, no real money
+service: osmm_svc_tg_members_std - Telegram Channel Members — Standard
+quote:   osmm_quote_... - 0.241200 USDC for 100 (mock rate)
+order:   osmm_order_... - REQUIRES_PAYMENT, clientReference "my-first-order"
+replay:  osmm_order_... - same orderId, no second order created
+done:    Python client OK
+```
+
+Arguments and options are the same as the Node.js REST client: an optional base
+URL (default `http://127.0.0.1:8080`), `--client-reference <ref>` for the
+idempotency key, and `--quote <quote-id>` to reuse a quote printed by another
+run instead of pricing a new one. The order also stays `REQUIRES_PAYMENT`, so
+the Python run touches no real supply and no money.
+
+### 4. The same order over MCP
 
 Copy the `quote:` line printed above — a quote is priced once and consumed once
 — and pass it to the MCP client with the same `clientReference`:
@@ -59,7 +88,7 @@ transport.
 Run without `--quote` and the MCP client prices a new quote itself (useful on
 its own; it cannot reuse an order that was made from a different quote).
 
-### 4. Connect a node to an MCP client (Подключить узел к MCP-клиенту)
+### 5. Connect a node to an MCP client (Подключить узел к MCP-клиенту)
 
 To use your node from Claude Desktop, Cursor, or any MCP-compatible client, add
 one of the following configuration blocks to your client's settings
@@ -104,6 +133,7 @@ Connects over Streamable HTTP to a running gateway (`npm run gateway` on `:8080`
 | Script | Path | Calls |
 | --- | --- | --- |
 | `rest-client.mjs` | REST `/v0` | `GET /v0/services` → `POST /v0/quotes` → `POST /v0/orders` ×2 |
+| `rest-client.py` | REST `/v0` | `GET /v0/capabilities` → `GET /v0/services` → `POST /v0/quotes` → `POST /v0/orders` ×2 |
 | `mcp-client.mjs` | MCP `/mcp` | `initialize` → `search_services` → `get_quote` → `create_order` ×2 |
 
 The MCP client speaks JSON-RPC directly, so it also shows the wire shape an MCP
