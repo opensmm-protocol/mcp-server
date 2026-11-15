@@ -134,6 +134,21 @@ npm run mcp:http  # http://localhost:3200/mcp — stateless Streamable HTTP, ope
 
 Production deployment (Docker, TLS, state persistence): [`docs/DEPLOY.md`](./docs/DEPLOY.md).
 
+## Checking a panel before you connect it (`smm-v2`)
+
+Read-only Level-0 check of a classic SMM API v2 panel — HTTPS and JSON vs
+HTML/Cloudflare, `action=balance`, `action=services`, envelope and field
+aliases — plus a suggested profile and a ready connection snippet. Nothing is
+registered and the key is never printed:
+
+```bash
+npm run doctor -- --url https://panel.example/api/v2 --key <key>
+node bin/opensmm.mjs doctor --url https://panel.example/api/v2 --key <key>
+```
+
+Exit `0` — all checks passed; `1` — a check failed. Details:
+[`docs/PROVIDER_ONBOARDING.md`](./docs/PROVIDER_ONBOARDING.md).
+
 ## Connecting a live provider (rest-v1)
 
 Both entry points boot against the MockProvider by default. To run the gateway

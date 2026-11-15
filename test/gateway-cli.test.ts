@@ -355,6 +355,30 @@ describe("bin/opensmm.mjs gateway — a node in one command", () => {
   });
 });
 
+describe("bin/opensmm.mjs doctor — panel check in one command", () => {
+  it("prints the doctor usage for `doctor --help` and exits 0", () => {
+    const result = runCli(["doctor", "--help"]);
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /--url/);
+    assert.match(result.stdout, /--key/);
+    assert.match(result.stdout, /--profile/);
+  });
+
+  it("rejects an unknown doctor option with a non-zero exit and no key leak", () => {
+    const result = runCli([
+      "doctor",
+      "--url",
+      "https://panel.example/api/v2",
+      "--key",
+      "doctor-secret-key",
+      "--nope",
+    ]);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Unknown option/);
+    assert.equal(result.stderr.includes("doctor-secret-key"), false);
+  });
+});
+
 describe("bin/opensmm.mjs gateway --state", () => {
   it("writes a snapshot and returns order after restart", async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "opensmm-state-"));

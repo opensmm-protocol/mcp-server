@@ -10,6 +10,23 @@ not write any code. Registration is one call.
 | `smm-v2`  | Classic panel API: `POST {endpoint}` with `key` + `action` (`services`, `add`, `status`, ...). Behavior profiles handle panel deviations. |
 | `rest-v1` | Reseller-style REST: `GET {endpoint}/services`, `POST {endpoint}/orders`, `GET {endpoint}/orders/:id`, Bearer auth. |
 
+## Before you start — check the endpoint (`smm-v2`)
+
+Read-only Level-0 diagnostics: HTTPS and JSON vs HTML/Cloudflare detection,
+`action=balance`, `action=services` with catalog size, envelope and field
+aliases, then a suggested profile and a ready connection snippet. Nothing is
+registered and the API key is never printed.
+
+```bash
+# from a checkout
+npm run doctor -- --url https://your-panel.example/api/v2 --key <your api key>
+# the same check through the CLI entry point
+node bin/opensmm.mjs doctor --url https://your-panel.example/api/v2 --key <your api key>
+```
+
+Exit code `0` — every check passed; `1` — a check failed and the report names
+it. Use the suggested `profile` in the registration call below.
+
 ## Option 1 — paste this prompt into your AI assistant
 
 ```text
