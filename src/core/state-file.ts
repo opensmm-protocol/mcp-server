@@ -43,8 +43,16 @@ export class StateFile {
   /**
    * Periodic save plus a final flush on SIGINT/SIGTERM. The autosave timer
    * is unref'd so it never keeps the process alive.
+   *
+   * `signalExit: false` is for an entry that owns an orderly shutdown: it
+   * drains connections and flushes the snapshot itself (the gateway), so a
+   * flush-and-exit hook here would cut that drain short.
    */
-  startAutosave(getSnapshot: () => CoreSnapshot, intervalMs = 30_000): void {
+  startAutosave(
+    getSnapshot: () => CoreSnapshot,
+    intervalMs = 30_000,
+    options: { signalExit?: boolean } = {},
+  ): void {
     this.stopAutosave();
     this.timer = setInterval(() => {
       try {
@@ -54,6 +62,7 @@ export class StateFile {
       }
     }, intervalMs);
     this.timer.unref();
+    if (options.signalExit === false) return;
     const flush = () => {
       try {
         this.save(getSnapshot());

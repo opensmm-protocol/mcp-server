@@ -10,9 +10,12 @@
 
 import { createServer, type Server } from "node:http";
 import path from "node:path";
-import { createStackFromEnv } from "../../bootstrap.ts";
+import { createStackFromEnv, type Stack } from "../../bootstrap.ts";
 import { createMcpHttpHandler } from "./mcp/http.ts";
 import { createRestHandler } from "./rest/handler.ts";
+
+/** Grace period a stop waits for open connections before forcing them shut. */
+const SHUTDOWN_GRACE_MS = 5_000;
 
 export interface GatewayOptions {
   /** Listen port; overrides PORT. 0 picks a free port (tests). */
@@ -89,7 +92,10 @@ export function parseGatewayCliArgs(
 
 export async function serveGateway(options: GatewayOptions = {}): Promise<Server> {
   if (options.stateFile) process.env.OPENSMM_STATE_FILE = options.stateFile;
-  const { core, provider } = await createStackFromEnv();
+  // The gateway owns SIGTERM/SIGINT: it drains connections, stops
+  // supervision and flushes the snapshot itself (installShutdownHandlers).
+  const stack = await createStackFromEnv({}, { stateFileSignalExit: false });
+  const { core, provider } = stack;
   const requestedPort = options.port ?? Number(process.env.PORT ?? 8080);
   const rest = createRestHandler(core);
   const mcp = createMcpHttpHandler(core);
@@ -113,7 +119,52 @@ export async function serveGateway(options: GatewayOptions = {}): Promise<Server
       `(REST /v0, MCP /mcp; provider: ${provider.providerId}` +
       `${provider.synthetic ? ", mock catalog — not real supply" : ""})`,
   );
+  installShutdownHandlers(server, stack);
   return server;
+}
+
+/**
+ * SIGTERM/SIGINT → one orderly stop: stop accepting connections, stop
+ * supervision, flush the state snapshot, exit 0. This is what makes
+ * `docker stop` (SIGTERM + 10s grace) safe on the deploy shape: orders and
+ * metrics reach the state file instead of dying with the process.
+ *
+ * Both process entry points (`npm run gateway`, the published CLI) go
+ * through `serveGateway`, so the handlers belong here — the entry owns the
+ * process, it is not a library for embedding.
+ */
+function installShutdownHandlers(
+  server: Server,
+  stack: Pick<Stack, "core" | "supervisor" | "stateFile">,
+): void {
+  let stopping = false;
+  let finished = false;
+  const stop = (signal: NodeJS.Signals): void => {
+    if (stopping) return;
+    stopping = true;
+    const finish = (): void => {
+      if (finished) return;
+      finished = true;
+      stack.supervisor.stop();
+      try {
+        stack.stateFile?.save(stack.core.exportState());
+      } catch (err) {
+        console.error(`opensmm: state flush on ${signal} failed: ${String(err)}`);
+      }
+      process.exit(0);
+    };
+    server.close(() => finish());
+    // Drop idle keep-alive sockets so close() can settle; long-lived MCP
+    // streams get SHUTDOWN_GRACE_MS and are then cut.
+    server.closeIdleConnections();
+    const forced = setTimeout(() => {
+      server.closeAllConnections();
+      finish();
+    }, SHUTDOWN_GRACE_MS);
+    forced.unref();
+  };
+  process.on("SIGTERM", stop);
+  process.on("SIGINT", stop);
 }
 
 const isMain =

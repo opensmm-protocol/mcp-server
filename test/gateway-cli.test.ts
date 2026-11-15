@@ -9,6 +9,7 @@
 import assert from "node:assert/strict";
 import { spawnSync, spawn, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
+import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { after, before, describe, it } from "node:test";
@@ -87,6 +88,37 @@ async function stopNode(node: RunningNode): Promise<void> {
 async function getJson(baseUrl: string, route: string): Promise<{ status: number; body: any }> {
   const res = await fetch(`${baseUrl}${route}`);
   return { status: res.status, body: await res.json() };
+}
+
+/** Raw TCP client: the tests below need control over request framing. */
+function connectSocket(port: number): Promise<net.Socket> {
+  return new Promise((resolve, reject) => {
+    const socket = net.connect(port, "127.0.0.1");
+    socket.once("connect", () => resolve(socket));
+    socket.once("error", reject);
+  });
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Poll a predicate until it holds; used for data that arrives on a socket. */
+function waitUntil(check: () => boolean, what: string, timeoutMs = 5_000): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const startedAt = Date.now();
+    const timer = setInterval(() => {
+      if (check()) {
+        clearInterval(timer);
+        resolve();
+        return;
+      }
+      if (Date.now() - startedAt > timeoutMs) {
+        clearInterval(timer);
+        reject(new Error(`timed out after ${timeoutMs}ms waiting for ${what}`));
+      }
+    }, 10);
+  });
 }
 
 async function postJson(
@@ -443,6 +475,108 @@ describe("bin/opensmm.mjs gateway --state", () => {
       assert.equal(restored.body.clientReference, "smoke-state-restart");
     } finally {
       await stopNode(second);
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("bin/opensmm.mjs gateway — graceful shutdown", () => {
+  it("drains an in-flight request, flushes the snapshot and exits 0 on SIGTERM", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "opensmm-shutdown-"));
+    const statePath = path.join(dir, "opensmm-state.json");
+    const node = await startNode(["--state", statePath]);
+    let socket: net.Socket | undefined;
+    try {
+      // An accepted order must survive the stop: it is what the card protects.
+      const catalog = await getJson(node.baseUrl, "/v0/services");
+      const serviceId: string = catalog.body.services[0].serviceId;
+      const quote = await postJson(node.baseUrl, "/v0/quotes", {
+        serviceId,
+        quantity: 100,
+        link: "https://t.me/opensmm_shutdown",
+      });
+      const order = await postJson(node.baseUrl, "/v0/orders", {
+        quoteId: quote.body.quoteId,
+        link: "https://t.me/opensmm_shutdown",
+        clientReference: "smoke-graceful-shutdown",
+      });
+      const orderId: string = order.body.orderId;
+
+      // A request whose headers are in and whose body is still pending: it is
+      // in flight from the server's point of view. `Expect: 100-continue`
+      // makes the handshake observable — the 100 line proves the gateway has
+      // the request before SIGTERM arrives.
+      const client = await connectSocket(node.port);
+      socket = client;
+      let response = "";
+      client.on("data", (chunk: Buffer) => {
+        response += chunk.toString();
+      });
+      const body = Buffer.from(
+        JSON.stringify({ serviceId, quantity: 100, link: "https://t.me/opensmm_drain" }),
+      );
+      client.write(
+        "POST /v0/quotes HTTP/1.1\r\n" +
+          `Host: 127.0.0.1:${node.port}\r\n` +
+          "Content-Type: application/json\r\n" +
+          "Expect: 100-continue\r\n" +
+          "Connection: close\r\n" +
+          `Content-Length: ${body.length}\r\n` +
+          "\r\n",
+      );
+      await waitUntil(() => response.includes("100 Continue"), "the gateway to accept the request");
+
+      const exited = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>(
+        (resolve) => {
+          node.child.once("exit", (code, signal) => resolve({ code, signal }));
+        },
+      );
+      node.child.kill("SIGTERM");
+
+      // A graceful stop waits for the active request instead of exiting at
+      // once: a process that dies here never drains anything.
+      await delay(400);
+      assert.equal(node.child.exitCode, null, "the in-flight request is drained, not dropped");
+      assert.equal(
+        response.includes("HTTP/1.1 201"),
+        false,
+        "the pending request is not answered before its body arrives",
+      );
+
+      client.write(body);
+      await waitUntil(() => response.includes("HTTP/1.1 201"), "the drained response");
+      assert.match(
+        response,
+        /^HTTP\/1\.1 100 Continue\r\n\r\nHTTP\/1\.1 201 /,
+        "the drained request is answered",
+      );
+
+      let deadlineTimer: NodeJS.Timeout | undefined;
+      const result = await Promise.race([
+        exited,
+        new Promise<never>((_, reject) => {
+          deadlineTimer = setTimeout(() => {
+            node.child.kill("SIGKILL");
+            reject(new Error("gateway did not exit within 10s of SIGTERM"));
+          }, 10_000);
+        }),
+      ]);
+      if (deadlineTimer) clearTimeout(deadlineTimer);
+
+      // The handler owns the signal: the process must not die from it.
+      assert.equal(result.signal, null, "SIGTERM is handled by the gateway");
+      assert.equal(result.code, 0, "graceful shutdown exits 0");
+
+      assert.ok(fs.existsSync(statePath), "the snapshot is written on SIGTERM");
+      const snapshot = JSON.parse(fs.readFileSync(statePath, "utf8"));
+      assert.equal(snapshot.format, 1, "the snapshot is valid gateway state");
+      assert.ok(
+        snapshot.orders.some((entry: { orderId: string }) => entry.orderId === orderId),
+        `the accepted order ${orderId} is in the snapshot`,
+      );
+    } finally {
+      socket?.destroy();
+      if (node.child.exitCode === null) node.child.kill("SIGKILL");
       fs.rmSync(dir, { recursive: true, force: true });
     }
   });
