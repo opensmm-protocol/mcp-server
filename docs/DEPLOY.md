@@ -229,6 +229,7 @@ package-only.
 |---|---|
 | `PORT` | Listen port (default 8080). |
 | `OPENSMM_ACCESS_LOG` | `0` turns off the JSON request log on stdout (default on): time, method, path, status, duration and `x-request-id`; no bodies, headers or query. |
+| `OPENSMM_MAX_BODY_BYTES` | Largest accepted request body in bytes for REST `/v0` and MCP `/mcp` (default 1048576 = 1 MiB). A bigger POST is answered `413 PAYLOAD_TOO_LARGE` and the body read stops, so the process keeps serving `/health`. |
 | `OPENSMM_REST_V1_BASE_URL` / `OPENSMM_REST_V1_API_KEY` | Live execution provider. Without them the gateway boots on the in-memory MockProvider (dev only). |
 | `OPENSMM_PROVIDER_PAYOUT` | Direct-settlement payTo address (USDC on Base) published in payment requirements. |
 | `OPENSMM_PROVIDER_LISTED_NAME` | Opt-in public displayName in `list_providers`. |

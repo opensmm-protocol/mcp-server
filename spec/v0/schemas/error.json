@@ -16,6 +16,7 @@
           "type": "string",
           "enum": [
             "VALIDATION_FAILED",
+            "PAYLOAD_TOO_LARGE",
             "NOT_FOUND",
             "SERVICE_UNAVAILABLE",
             "QUOTE_EXPIRED",

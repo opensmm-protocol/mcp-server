@@ -8,6 +8,7 @@ import { z } from "zod";
 import type { OpenSmmCore } from "../../../core/core.ts";
 import { OpenSmmError, toErrorBody } from "../../../core/errors.ts";
 import { beginAccessLog } from "../access-log.ts";
+import { maxBodyBytesFromEnv, readBodyLimited } from "../body.ts";
 
 const NODE_VERSION = "0.1.0";
 
@@ -53,12 +54,8 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
   res.end(payload);
 }
 
-async function readJsonBody(req: IncomingMessage): Promise<unknown> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of req) {
-    chunks.push(chunk as Buffer);
-  }
-  const raw = Buffer.concat(chunks).toString("utf8").trim();
+async function readJsonBody(req: IncomingMessage, maxBodyBytes: number): Promise<unknown> {
+  const raw = (await readBodyLimited(req, maxBodyBytes)).toString("utf8").trim();
   if (!raw) return {};
   try {
     return JSON.parse(raw);
@@ -80,6 +77,7 @@ function validate<T>(schema: z.ZodType<T>, data: unknown): T {
 export function createRestHandler(
   core: OpenSmmCore,
 ): (req: IncomingMessage, res: ServerResponse) => Promise<void> {
+  const maxBodyBytes = maxBodyBytesFromEnv();
   return async (req, res) => {
     beginAccessLog(req, res);
     try {
@@ -119,7 +117,7 @@ export function createRestHandler(
       }
 
       if (method === "POST" && path === "/v0/providers") {
-        const input = validate(registerProviderSchema, await readJsonBody(req));
+        const input = validate(registerProviderSchema, await readJsonBody(req, maxBodyBytes));
         // The response never echoes apiKey back (spec/v0 §10).
         sendJson(res, 201, await core.registerProvider(input));
         return;
@@ -155,13 +153,13 @@ export function createRestHandler(
       }
 
       if (method === "POST" && path === "/v0/quotes") {
-        const input = validate(createQuoteSchema, await readJsonBody(req));
+        const input = validate(createQuoteSchema, await readJsonBody(req, maxBodyBytes));
         sendJson(res, 201, core.getQuote(input));
         return;
       }
 
       if (method === "POST" && path === "/v0/orders") {
-        const body = validate(createOrderSchema, await readJsonBody(req));
+        const body = validate(createOrderSchema, await readJsonBody(req, maxBodyBytes));
         const idempotencyKey = req.headers["idempotency-key"];
         const clientReference =
           body.clientReference ??
@@ -199,7 +197,7 @@ export function createRestHandler(
 
       m = /^\/v0\/payments\/([^/]+)\/settle$/.exec(path);
       if (method === "POST" && m) {
-        const body = (await readJsonBody(req)) as Record<string, unknown>;
+        const body = (await readJsonBody(req, maxBodyBytes)) as Record<string, unknown>;
         const settleMethod = body.method === undefined ? undefined : String(body.method);
         if (
           settleMethod !== undefined &&

@@ -2,6 +2,7 @@
 
 export const ERROR_CODES = [
   "VALIDATION_FAILED",
+  "PAYLOAD_TOO_LARGE",
   "NOT_FOUND",
   "SERVICE_UNAVAILABLE",
   "QUOTE_EXPIRED",
@@ -19,6 +20,7 @@ export type ErrorCode = (typeof ERROR_CODES)[number];
 
 const HTTP_STATUS: Record<ErrorCode, number> = {
   VALIDATION_FAILED: 400,
+  PAYLOAD_TOO_LARGE: 413,
   NOT_FOUND: 404,
   SERVICE_UNAVAILABLE: 409,
   QUOTE_EXPIRED: 409,
