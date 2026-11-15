@@ -12,15 +12,28 @@
 
 import { readFileSync } from "node:fs";
 
-const NODE_BUDGET_MS = 5000;
+const DEFAULT_TIMEOUT_MS = 5000;
+const MIN_TIMEOUT_MS = 1000;
+const MAX_TIMEOUT_MS = 30000;
 const MAX_NODES = 20;
 
-const USAGE = `usage: node scripts/node-census.mjs (--url <url> | --file <path>)...
-  --url <url>    gateway base URL, repeatable
-  --file <path>  file with one URL per line ("#" starts a comment line)
+const USAGE = `usage: node scripts/node-census.mjs (--url <url> | --file <path>)... [--timeout <ms>]
+  --url <url>     gateway base URL, repeatable
+  --file <path>   file with one URL per line ("#" starts a comment line)
+  --timeout <ms>  budget for all probes of one node, ${MIN_TIMEOUT_MS}-${MAX_TIMEOUT_MS} ms (default ${DEFAULT_TIMEOUT_MS})
   max ${MAX_NODES} unique URLs per run; output is JSON on stdout, a summary on stderr`;
 
 class UsageError extends Error {}
+
+export function parseTimeout(value, source = "--timeout") {
+  const ms = Number(value);
+  if (!Number.isInteger(ms) || ms < MIN_TIMEOUT_MS || ms > MAX_TIMEOUT_MS) {
+    throw new UsageError(
+      `${source}: expected an integer between ${MIN_TIMEOUT_MS} and ${MAX_TIMEOUT_MS} ms, got "${value}"`,
+    );
+  }
+  return ms;
+}
 
 export function parseUrl(value, source) {
   let url;
@@ -43,15 +56,17 @@ export function parseUrl(value, source) {
 function parseArgs(argv) {
   const urls = [];
   const files = [];
+  let timeoutMs = DEFAULT_TIMEOUT_MS;
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
-    if (arg === "--url" || arg === "--file") {
+    if (arg === "--url" || arg === "--file" || arg === "--timeout") {
       const value = argv[i + 1];
       if (value === undefined || value.startsWith("--")) {
         throw new UsageError(`${arg} requires a value`);
       }
       if (arg === "--url") urls.push(parseUrl(value, "--url"));
-      else files.push(value);
+      else if (arg === "--file") files.push(value);
+      else timeoutMs = parseTimeout(value);
       i += 1;
     } else if (arg === "--help" || arg === "-h") {
       process.stdout.write(`${USAGE}\n`);
@@ -80,7 +95,7 @@ function parseArgs(argv) {
   if (unique.length > MAX_NODES) {
     throw new UsageError(`${unique.length} unique URLs given; the limit is ${MAX_NODES} per run`);
   }
-  return unique;
+  return { urls: unique, timeoutMs };
 }
 
 async function readBody(res) {
@@ -117,8 +132,8 @@ function countOf(payload, key) {
   return Array.isArray(list) ? list.length : null;
 }
 
-function errorText(err) {
-  if (err && err.name === "AbortError") return `no answer in ${NODE_BUDGET_MS / 1000} s`;
+function errorText(err, timeoutMs) {
+  if (err && err.name === "AbortError") return `no answer in ${timeoutMs / 1000} s`;
   const cause = err && err.cause && err.cause.message ? `: ${err.cause.message}` : "";
   return `${(err && err.message) || String(err)}${cause}`;
 }
@@ -133,8 +148,11 @@ function pluralEn(n, one, many) {
  * never re-implement them.
  *
  * @param {string} baseUrl
+ * @param {{ timeoutMs?: number }} [options]
  */
-export async function censusNode(baseUrl) {
+export async function censusNode(baseUrl, options = {}) {
+  const timeoutMs =
+    options.timeoutMs === undefined ? DEFAULT_TIMEOUT_MS : parseTimeout(options.timeoutMs, "timeoutMs");
   const started = Date.now();
   const entry = {
     url: baseUrl,
@@ -148,9 +166,9 @@ export async function censusNode(baseUrl) {
   const errors = [];
   let servicesOk = false;
 
-  // One budget for all three probes, so a dead host costs 5 s, not 15.
+  // One budget for all three probes, so a dead host costs one timeout, not three.
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), NODE_BUDGET_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     try {
@@ -172,8 +190,8 @@ export async function censusNode(baseUrl) {
         });
       }
     } catch (err) {
-      errors.push(`GET /v0/services: ${errorText(err)}`);
-      checks.push({ name: "GET /v0/services", ok: false, detail: errorText(err) });
+      errors.push(`GET /v0/services: ${errorText(err, timeoutMs)}`);
+      checks.push({ name: "GET /v0/services", ok: false, detail: errorText(err, timeoutMs) });
     }
 
     try {
@@ -211,8 +229,8 @@ export async function censusNode(baseUrl) {
         checks.push({ name: "POST /mcp initialize", ok: true, detail: `${protocol}${server}` });
       }
     } catch (err) {
-      errors.push(`POST /mcp initialize: ${errorText(err)}`);
-      checks.push({ name: "POST /mcp initialize", ok: false, detail: errorText(err) });
+      errors.push(`POST /mcp initialize: ${errorText(err, timeoutMs)}`);
+      checks.push({ name: "POST /mcp initialize", ok: false, detail: errorText(err, timeoutMs) });
     }
 
     try {
@@ -225,7 +243,7 @@ export async function censusNode(baseUrl) {
       checks.push({ name: "GET /v0/providers", ok: res.ok && entry.providers !== null, detail, required: false });
     } catch (err) {
       // Providers are informational: a node is judged by services + initialize.
-      checks.push({ name: "GET /v0/providers", ok: false, detail: errorText(err), required: false });
+      checks.push({ name: "GET /v0/providers", ok: false, detail: errorText(err, timeoutMs), required: false });
     }
   } finally {
     clearTimeout(timer);
@@ -237,8 +255,8 @@ export async function censusNode(baseUrl) {
   return { entry, checks };
 }
 
-async function census(baseUrl) {
-  return (await censusNode(baseUrl)).entry;
+async function census(baseUrl, timeoutMs) {
+  return (await censusNode(baseUrl, { timeoutMs })).entry;
 }
 
 function pluralNodes(n) {
@@ -251,8 +269,9 @@ function pluralNodes(n) {
 
 async function main() {
   let urls;
+  let timeoutMs;
   try {
-    urls = parseArgs(process.argv.slice(2));
+    ({ urls, timeoutMs } = parseArgs(process.argv.slice(2)));
   } catch (err) {
     if (err instanceof UsageError) {
       process.stderr.write(`node-census: ${err.message}\n${USAGE}\n`);
@@ -262,7 +281,7 @@ async function main() {
   }
 
   const results = [];
-  for (const url of urls) results.push(await census(url));
+  for (const url of urls) results.push(await census(url, timeoutMs));
 
   const up = results.filter((r) => r.status === "up").length;
   process.stdout.write(`${JSON.stringify(results, null, 2)}\n`);

@@ -57,6 +57,7 @@ function startMockNode(): Promise<{ server: Server; baseUrl: string }> {
       res.writeHead(200, { "content-type": "text/html" }).end("<html><body>app</body></html>");
       return;
     }
+    if (path.startsWith("/slow/")) return; // never answers: the client timeout decides
     if (req.method === "GET" && path === "/v0/services") {
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify({ services: [{ serviceId: "svc_1" }], catalogVersion: "mock-1" }));
@@ -144,6 +145,30 @@ describe("scripts/node-census.mjs", () => {
     assert.equal(code, 0);
     assert.equal(nodes.length, 1);
     assert.match(stderr, /1 узел: 1 up, 0 down/);
+  });
+
+  it("accepts a custom --timeout on a responding node", async () => {
+    const { code, nodes } = await census("--timeout", "10000", "--url", mock.baseUrl);
+    assert.equal(code, 0);
+    assert.equal(nodes[0]!.status, "up");
+  });
+
+  it("applies --timeout to a node that never answers", async () => {
+    const { code, nodes } = await census("--timeout", "1000", "--url", `${mock.baseUrl}/slow`);
+    assert.equal(code, 0);
+    assert.equal(nodes[0]!.status, "down");
+    assert.match(nodes[0]!.error ?? "", /no answer in 1 s/);
+    assert.ok(nodes[0]!.latencyMs >= 900, `latency ${nodes[0]!.latencyMs} ms`);
+    assert.ok(nodes[0]!.latencyMs < 4000, `latency ${nodes[0]!.latencyMs} ms`);
+  });
+
+  it("rejects a --timeout outside 1000-30000 ms", async () => {
+    for (const value of ["abc", "-1", "0", "999", "30001", "1.5"]) {
+      const { code, stderr } = await census("--timeout", value, "--url", mock.baseUrl);
+      assert.equal(code, 1, `--timeout ${value}`);
+      assert.match(stderr, /--timeout: expected an integer between 1000 and 30000 ms, got "/);
+    }
+    assert.equal((await census("--url", mock.baseUrl, "--timeout")).code, 1);
   });
 
   it("rejects URLs with credentials and does not echo them", async () => {

@@ -7,10 +7,11 @@
  * Usage: npm run verify:node -- http://127.0.0.1:8080
  */
 
-import { censusNode, parseUrl } from "./node-census.mjs";
+import { censusNode, parseTimeout, parseUrl } from "./node-census.mjs";
 
-const USAGE = `usage: npm run verify:node -- <url>
-  <url>  gateway base URL, e.g. http://127.0.0.1:8080
+const USAGE = `usage: npm run verify:node -- <url> [--timeout <ms>]
+  <url>          gateway base URL, e.g. http://127.0.0.1:8080
+  --timeout <ms> budget for all probes of one node, 1000-30000 ms (default 5000)
 
 Prints PASS/FAIL for GET /v0/services and POST /mcp initialize — the two checks
 the census counts — plus GET /v0/providers (informational), then a verdict.
@@ -26,22 +27,33 @@ async function main(argv) {
     report([USAGE]);
     return 0;
   }
-  if (argv.length !== 1) {
-    process.stderr.write(
-      `verify-node: ${argv.length === 0 ? "no URL given" : `expected one URL, got ${argv.length}`}\n${USAGE}\n`,
-    );
-    return 1;
-  }
 
   let url;
+  let timeoutMs;
   try {
-    url = parseUrl(argv[0], "<url>");
+    const positional = [];
+    for (let i = 0; i < argv.length; i += 1) {
+      const arg = argv[i];
+      if (arg === "--timeout") {
+        const value = argv[i + 1];
+        if (value === undefined || value.startsWith("--")) throw new Error("--timeout requires a value");
+        timeoutMs = parseTimeout(value);
+        i += 1;
+      } else if (arg.startsWith("-")) {
+        throw new Error(`unknown argument: ${arg}`);
+      } else {
+        positional.push(arg);
+      }
+    }
+    if (positional.length === 0) throw new Error("no URL given");
+    if (positional.length > 1) throw new Error(`expected one URL, got ${positional.length}`);
+    url = parseUrl(positional[0], "<url>");
   } catch (err) {
     process.stderr.write(`verify-node: ${err.message}\n${USAGE}\n`);
     return 1;
   }
 
-  const { entry, checks } = await censusNode(url);
+  const { entry, checks } = await censusNode(url, { timeoutMs });
   const required = checks.filter((check) => check.required !== false);
   const passed = required.filter((check) => check.ok).length;
 

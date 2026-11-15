@@ -108,6 +108,20 @@ minutes») is checked the same way:
 Limit is 20 URLs per run. Output is JSON on stdout; a summary goes to stderr.
 An unreachable node is data, not a failure: `status: "down"`, exit 0. Exit 1 = broken arguments.
 
+Both commands take `--timeout <ms>`: one budget for all three probes of a node,
+default 5000 ms, allowed range 1000–30000 ms. On a slow network raise it, so a
+reachable node is not reported as down:
+
+```sh
+npm run verify:node -- --timeout 10000 http://127.0.0.1:8080
+npm run census -- --timeout 10000 --url https://mcp.opensmm.dev
+node scripts/node-census.mjs --timeout 10000 --url https://mcp.opensmm.dev
+```
+
+A value outside the range or not an integer (`--timeout abc`, `--timeout -1`)
+is a broken argument: exit 1 with the message
+`--timeout: expected an integer between 1000 and 30000 ms`.
+
 ## Weekly report line
 
 Copy one line per week into the ZHC-324 thread, with the JSON below it:
