@@ -61,6 +61,32 @@ What you see after the start:
 Troubleshooting common startup issues (port conflict, Node version, state file permissions, offline npm ci, mock catalog):
 [`docs/TROUBLESHOOTING.md`](./TROUBLESHOOTING.md).
 
+## Health check
+
+The node exposes a liveness endpoint for reverse proxies, load balancers and
+container monitors: `GET /health` (also reachable as `GET /v0/health`). It
+answers `200` on the mock catalog, on a live provider and while the catalog is
+still syncing — it reports the process, not the supply.
+
+```bash
+curl -s http://localhost:8080/health
+```
+
+```json
+{
+  "status": "ok",
+  "version": "0.1.0",
+  "uptime": 12.345
+}
+```
+
+`uptime` is the process uptime in seconds. The response is CORS-open
+(`access-control-allow-origin: *`) and `OPTIONS /health` answers `204`, so a
+browser or a dashboard can poll it directly. Use it as the upstream check in
+Caddy/nginx and as the container liveness probe. It reports the process, not
+the supply: the full check — catalog plus MCP `initialize` — stays with
+`npm run verify:node` and `npm run census`.
+
 ## Docker (optional)
 
 The supported Docker route today is a local build from this checkout. The
