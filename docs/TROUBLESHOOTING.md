@@ -321,5 +321,6 @@ npm run gateway
 
 For SMM API v2 panels, use the pre-onboarding diagnostic tool first:
 ```bash
-node src/cli/provider-doctor.ts --url https://panel.example/api/v2 --key YOUR_KEY
+npm run doctor -- --url https://panel.example/api/v2 --key YOUR_KEY
+node bin/opensmm.mjs doctor --url https://panel.example/api/v2 --key YOUR_KEY
 ```
