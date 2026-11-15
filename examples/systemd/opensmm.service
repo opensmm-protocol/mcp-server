@@ -1,0 +1,61 @@
+# OpenSMM node as a systemd service (Linux VPS without Docker).
+#
+# Install: see examples/systemd/README.md
+#   sudo cp examples/systemd/opensmm.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now opensmm
+#
+# Adjust ExecStart and WorkingDirectory to where the checkout lives and to
+# the absolute path of your Node.js >= 22.18 binary (`command -v node`).
+
+[Unit]
+Description=OpenSMM gateway node (REST /v0 and MCP /mcp on one port)
+Documentation=https://github.com/opensmm-protocol/mcp-server/blob/main/docs/DEPLOY.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=opensmm
+Group=opensmm
+WorkingDirectory=/opt/opensmm/mcp-server
+
+# Every variable of .env.example can live in this file; it must stay 0600
+# because it holds provider and payment credentials.
+# Defaults below are overridden by the same variable in the environment file.
+Environment=NODE_ENV=production
+Environment=OPENSMM_STATE_FILE=/var/lib/opensmm/opensmm-state.json
+EnvironmentFile=/etc/opensmm/opensmm.env
+
+ExecStart=/usr/bin/node bin/opensmm.mjs gateway
+
+# Restart on any exit: a crashed or OOM-killed node comes back on its own.
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+
+# Limits: open descriptors and a memory ceiling for a single node.
+LimitNOFILE=65535
+MemoryMax=512M
+
+# State directory: systemd creates /var/lib/opensmm and makes it writable
+# for the service user even with ProtectSystem=strict.
+StateDirectory=opensmm
+StateDirectoryMode=0700
+UMask=0077
+
+# Hardening: unprivileged user, read-only system, no privilege escalation.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=opensmm
+
+[Install]
+WantedBy=multi-user.target
