@@ -11,6 +11,7 @@ import type { OpenSmmCore } from "../../../core/core.ts";
 import { OpenSmmError } from "../../../core/errors.ts";
 import { beginAccessLog } from "../access-log.ts";
 import { maxBodyBytesFromEnv, readBodyLimited } from "../body.ts";
+import { createRateLimiterFromEnv, type PerIpRateLimiter } from "../rate-limit.ts";
 import { createMcpServer } from "./server.ts";
 
 const MCP_CORS_HEADERS = "content-type, mcp-protocol-version, mcp-session-id";
@@ -21,10 +22,17 @@ async function readBody(req: IncomingMessage, maxBodyBytes: number): Promise<unk
   return JSON.parse(raw);
 }
 
+export interface McpHttpHandlerOptions {
+  /** Per-IP request limit; defaults to OPENSMM_RATE_LIMIT_PER_MIN (120/min). */
+  rateLimiter?: PerIpRateLimiter;
+}
+
 export function createMcpHttpHandler(
   core: OpenSmmCore,
+  options: McpHttpHandlerOptions = {},
 ): (req: IncomingMessage, res: ServerResponse) => Promise<void> {
   const maxBodyBytes = maxBodyBytesFromEnv();
+  const rateLimiter = options.rateLimiter ?? createRateLimiterFromEnv();
   return async (req, res) => {
     beginAccessLog(req, res);
     res.setHeader("access-control-allow-origin", "*");
@@ -40,6 +48,9 @@ export function createMcpHttpHandler(
       res.end();
       return;
     }
+    // One sliding window per client IP, shared with REST when both bindings
+    // run in one gateway (serveGateway passes a single limiter to both).
+    if (!rateLimiter.enforce(req, res)) return;
     if (path !== "/mcp") {
       res.writeHead(404, { "content-type": "application/json" });
       res.end(JSON.stringify({ error: { code: "NOT_FOUND", message: "MCP endpoint is /mcp" } }));

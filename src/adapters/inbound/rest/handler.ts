@@ -9,6 +9,7 @@ import type { OpenSmmCore } from "../../../core/core.ts";
 import { OpenSmmError, toErrorBody } from "../../../core/errors.ts";
 import { beginAccessLog } from "../access-log.ts";
 import { maxBodyBytesFromEnv, readBodyLimited } from "../body.ts";
+import { createRateLimiterFromEnv, type PerIpRateLimiter } from "../rate-limit.ts";
 
 const NODE_VERSION = "0.1.0";
 
@@ -74,10 +75,17 @@ function validate<T>(schema: z.ZodType<T>, data: unknown): T {
   return result.data;
 }
 
+export interface RestHandlerOptions {
+  /** Per-IP request limit; defaults to OPENSMM_RATE_LIMIT_PER_MIN (120/min). */
+  rateLimiter?: PerIpRateLimiter;
+}
+
 export function createRestHandler(
   core: OpenSmmCore,
+  options: RestHandlerOptions = {},
 ): (req: IncomingMessage, res: ServerResponse) => Promise<void> {
   const maxBodyBytes = maxBodyBytesFromEnv();
+  const rateLimiter = options.rateLimiter ?? createRateLimiterFromEnv();
   return async (req, res) => {
     beginAccessLog(req, res);
     try {
@@ -105,6 +113,10 @@ export function createRestHandler(
         });
         return;
       }
+
+      // Everything below is client traffic: one sliding window per IP (/health
+      // above and the OPTIONS preflight never consume it).
+      if (!rateLimiter.enforce(req, res)) return;
 
       if (method === "GET" && path === "/v0/capabilities") {
         sendJson(res, 200, core.getCapabilities());

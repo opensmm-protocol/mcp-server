@@ -117,6 +117,7 @@ Canonical codes:
 | `SUBMISSION_UNKNOWN`  | Provider submission outcome unknown; manual reconciliation (HTTP 502). |
 | `PROVIDER_REJECTED`   | Provider refused the order (HTTP 502). |
 | `POLICY_DENIED`       | Policy engine denied the request (HTTP 403). |
+| `RATE_LIMITED`        | Too many requests from one client IP; retry after `Retry-After` seconds (HTTP 429). |
 | `IDEMPOTENCY_CONFLICT`| Same idempotency key, different parameters (HTTP 409). |
 | `REFUND_REQUIRED`     | Money received but order cannot be executed (HTTP 500). |
 | `INTERNAL`            | Anything else (HTTP 500). |

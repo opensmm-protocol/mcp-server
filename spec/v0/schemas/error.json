@@ -26,6 +26,7 @@
             "SUBMISSION_UNKNOWN",
             "PROVIDER_REJECTED",
             "POLICY_DENIED",
+            "RATE_LIMITED",
             "IDEMPOTENCY_CONFLICT",
             "REFUND_REQUIRED",
             "INTERNAL"
