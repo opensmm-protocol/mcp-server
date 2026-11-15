@@ -15,6 +15,7 @@
 import { readFileSync } from "node:fs";
 import { z } from "zod";
 import { InMemoryCatalog, type CatalogEntry } from "./catalog.ts";
+import { normalizeCurrencyCode } from "./money.ts";
 import type { Platform, Objective, RateBasis, Service } from "./types.ts";
 
 export const CURATED_FORMAT = 1;
@@ -191,7 +192,21 @@ export function parseCuratedCatalog(
   if (issues.length > 0) {
     throw new CuratedCatalogError(source, issues);
   }
-  return file;
+  // Currency codes are normalized at ingest: a curated "usdc" must not become a
+  // second currency next to a provider's "USDC" in the gateway catalog.
+  return {
+    ...file,
+    entries: file.entries.map((entry) => ({
+      ...entry,
+      service: {
+        ...entry.service,
+        rate: {
+          ...entry.service.rate,
+          currency: normalizeCurrencyCode(entry.service.rate.currency),
+        },
+      },
+    })),
+  };
 }
 
 /** Read and validate a curated catalog file; any problem is fatal. */

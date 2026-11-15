@@ -106,6 +106,24 @@ The gateway builds from the local `Dockerfile`, mounts the named volume
 `opensmm-data` for state (`/data`), and binds port 8080 to loopback
 (`127.0.0.1:8080:8080`).
 
+State goes to `/data/opensmm-state.json` on that volume: `docker-compose.yml`
+sets `OPENSMM_STATE_FILE=/data/opensmm-state.json` in
+`services.gateway.environment`, so orders and metrics survive
+`docker compose restart` and `docker compose down` (the volume stays).
+Without the variable the gateway keeps state in memory only and loses orders
+on every restart.
+
+The compose service declares a `healthcheck` that polls `GET /v0/services`
+inside the container with `node -e` (the runtime image ships no curl/wget).
+`/v0/services` answers only after the catalog is loaded, so `healthy` means
+"ready to take an order", not just "process up" — `/health` covers the
+process check for proxies. Wait for `healthy` before sending traffic:
+
+```bash
+docker compose ps                      # STATUS column shows "healthy"
+docker inspect --format '{{.State.Health.Status}}' $(docker compose ps -q gateway)
+```
+
 Verify the node before the weekly census:
 
 ```bash
@@ -163,6 +181,28 @@ node scripts/node-census.mjs --url http://localhost:8080   # same check without 
 
 The state file (`/data/opensmm-state.json`) contains provider credentials —
 it is written with mode `0600`; back it up like a secret.
+
+## systemd service (Linux without Docker)
+
+Without Docker the node is a single process: run it under systemd so it starts
+at boot and restarts after a crash, an OOM kill or a reboot. The ready unit and
+the step-by-step install live in
+[`../examples/systemd/`](../examples/systemd/README.md):
+[`opensmm.service`](../examples/systemd/opensmm.service) (unprivileged user,
+`Restart=always`, `EnvironmentFile=/etc/opensmm/opensmm.env`,
+`StateDirectory=opensmm`) plus the README that sets up the service user, the
+checkout, the environment file, `/var/lib/opensmm` for state and the
+`systemctl enable --now opensmm` command.
+
+The same two checks as everywhere else confirm the service:
+
+```bash
+curl -s http://127.0.0.1:8080/health
+npm run verify:node -- http://127.0.0.1:8080
+```
+
+The unit listens on `0.0.0.0` like every other route — put Caddy in front
+(next section) before the node is reachable from the internet.
 
 ## TLS + public endpoint (Caddy)
 

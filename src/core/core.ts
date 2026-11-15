@@ -9,7 +9,7 @@ import { providerOfferToCatalogEntry } from "./catalog-map.ts";
 import { OpenSmmError } from "./errors.ts";
 import { newId, nowIso } from "./ids.ts";
 import { MetricsRecorder, type MetricsState } from "./metrics.ts";
-import { parseDecimal, quoteAmount } from "./money.ts";
+import { normalizeCurrencyCode, parseDecimal, quoteAmount } from "./money.ts";
 import { PaymentRejectedError, type PaymentRail } from "./payment-rail.ts";
 import { ProviderRegistry, type ProviderNode } from "./provider-registry.ts";
 import {
@@ -443,25 +443,42 @@ export class OpenSmmCore {
       candidates.push(entry);
     }
 
+    const covers = (service: CatalogEntry["service"], quantity: number): boolean =>
+      quantity >= service.minQuantity && quantity <= service.maxQuantity;
+
     // Unit prices in different currencies are not comparable and the gateway holds
     // no exchange rates, so the comparison stays inside ONE currency: the requested
     // one, else the one most candidates are priced in (ties broken by code, so the
     // choice is deterministic). Offers in other currencies are reported, not ranked.
-    const currencyCounts = new Map<string, number>();
-    for (const entry of candidates) {
-      const code = entry.service.rate.currency;
-      currencyCounts.set(code, (currencyCounts.get(code) ?? 0) + 1);
-    }
+    // The default is chosen among offers that can deliver the requested quantity:
+    // picking a currency whose offers all cap below it would answer "no offers"
+    // while a covering offer exists in another currency.
+    const deliverable =
+      input.quantity !== undefined
+        ? candidates.filter((entry) => covers(entry.service, input.quantity!))
+        : candidates;
+    const pool = deliverable.length > 0 ? deliverable : candidates;
+    const countCurrencies = (entries: CatalogEntry[]): Map<string, number> => {
+      const counts = new Map<string, number>();
+      for (const entry of entries) {
+        const code = normalizeCurrencyCode(entry.service.rate.currency);
+        counts.set(code, (counts.get(code) ?? 0) + 1);
+      }
+      return counts;
+    };
+    const currencyCounts = countCurrencies(candidates);
+    const mostOffered = (counts: Map<string, number>): string | undefined =>
+      [...counts.entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))[0]?.[0];
     const currency =
-      input.currency ??
-      [...currencyCounts.entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))[0]?.[0];
+      (input.currency !== undefined ? normalizeCurrencyCode(input.currency) : undefined) ??
+      mostOffered(countCurrencies(pool));
     const excludedCurrencies = [...currencyCounts.keys()]
       .filter((code) => code !== currency)
       .sort();
 
     const byProvider = new Map<string, CatalogEntry[]>();
     for (const entry of candidates) {
-      if (entry.service.rate.currency !== currency) continue;
+      if (normalizeCurrencyCode(entry.service.rate.currency) !== currency) continue;
       const list = byProvider.get(entry.providerId);
       if (list) list.push(entry);
       else byProvider.set(entry.providerId, [entry]);
@@ -473,11 +490,7 @@ export class OpenSmmCore {
       // that covers the requested quantity (without a quantity: the cheapest overall).
       const eligible =
         input.quantity !== undefined
-          ? entries.filter(
-              (e) =>
-                input.quantity! >= e.service.minQuantity &&
-                input.quantity! <= e.service.maxQuantity,
-            )
+          ? entries.filter((e) => covers(e.service, input.quantity!))
           : entries;
       if (eligible.length === 0) continue; // this provider cannot deliver the requested quantity
       const cheapest = eligible.reduce((a, b) =>
@@ -485,17 +498,21 @@ export class OpenSmmCore {
       );
       const service = cheapest.service;
       const quantityPriced = input.quantity ?? service.minQuantity;
+      const rate: Money = {
+        ...service.rate,
+        currency: normalizeCurrencyCode(service.rate.currency),
+      };
       const node = this.registry.get(providerId);
       offers.push({
         providerRef: node?.providerKey ?? providerId,
         serviceId: service.serviceId,
         serviceName: service.name,
-        rate: service.rate,
+        rate,
         rateBasis: service.rateBasis,
         minQuantity: service.minQuantity,
         maxQuantity: service.maxQuantity,
         quantityPriced,
-        total: quoteAmount(service.rate, service.rateBasis, quantityPriced),
+        total: quoteAmount(rate, service.rateBasis, quantityPriced),
         quality: this.qualityFor(service, providerId),
       });
     }

@@ -5,6 +5,7 @@
  */
 
 import type { CatalogEntry } from "./catalog.ts";
+import { normalizeCurrencyCode } from "./money.ts";
 import type { Objective, Platform } from "./types.ts";
 import type { ProviderOffer } from "./provider-spi.ts";
 
@@ -55,7 +56,7 @@ export function providerOfferToCatalogEntry(offer: ProviderOffer, providerId: st
       platform,
       objective: inferObjective(haystack, platform),
       ...(offer.category !== undefined ? { category: offer.category } : {}),
-      rate: { value: offer.rate, currency: offer.currency },
+      rate: { value: offer.rate, currency: normalizeCurrencyCode(offer.currency) },
       rateBasis: offer.rateBasis,
       minQuantity: offer.minQuantity,
       maxQuantity: offer.maxQuantity,

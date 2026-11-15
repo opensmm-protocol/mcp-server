@@ -8,6 +8,8 @@
 **Status: `0.1.0` — first public release. The spec and reference gateway are
 feature-complete for v0 and covered by tests.**
 
+**Run a node:** [`docs/NODES.md`](./docs/NODES.md) (node checks, public URL) ·
+[`docs/DEPLOY.md`](./docs/DEPLOY.md) (Docker, TLS, state).
 **For AI agents:** start with [`llms.txt`](./llms.txt).
 **For supply nodes:** [`docs/PROVIDER_ONBOARDING.md`](./docs/PROVIDER_ONBOARDING.md) —
 zero-code registration, including a copy-paste prompt for your AI assistant.
@@ -210,7 +212,8 @@ cheapest offer per provider for a `platform`+`objective`, cheapest first,
 with measured quality and the total price for your `quantity` — SUSPENDED
 providers are excluded. Prices are ranked inside a single currency and never
 converted: `compare_offers` reports the `currency` it ranked in (pass
-`currency` to choose it, default is the most offered one) and lists any other
+`currency` to choose it — codes are matched case-insensitively; the default is
+the most offered currency that can deliver your `quantity`) and lists any other
 currencies in `excludedCurrencies`. `GET /v0/services` supports the same
 `sort` parameter.
 
@@ -389,12 +392,16 @@ download metric — is documented in [`docs/REGISTRY.md`](./docs/REGISTRY.md).
 8. 🟡 x402: rail done (incl. `SETTLEMENT_PENDING`) with a real facilitator
      client configured via env — testnet setup and live-run script in
      [`docs/X402_TESTNET.md`](./docs/X402_TESTNET.md). First live Base Sepolia
-     payment pending a funded payer key.
+     payment pending a funded payer key (in progress).
 9. ✅ Background catalog sync + healthchecks with circuit breaker
      (`SUSPENDED` on degradation).
 10. ✅ Gateway-measured metrics feeding the public provider showcase.
 11. ⬜ x402 mainnet: real small-amount payment.
 12. ⬜ Public MVP: 30–50 curated services. No account farms, no A2A yet.
+13. ⬜ Supply integration: onboard the ProstoSpets panel (SMM API v2) as a live
+    provider node via the `smm-v2` adapter. Waits for the panel API key.
+
+Source of truth for status: [`PROJECT.md`](./PROJECT.md).
 
 ## Legal notice
 

@@ -62,7 +62,8 @@ measured quality and the total price for your quantity — the direct answer to
 «who is cheaper and who is more reliable for this». Offers are ranked inside a
 single currency: prices are never converted, so offers in other currencies are
 reported in excludedCurrencies instead of being ranked against them (pass
-`currency` to pick the one you pay in; default is the most offered currency).
+`currency` to pick the one you pay in, codes are case-insensitive; default is
+the most offered currency that covers your quantity).
 SUSPENDED providers never appear.
 
 ## Docs
