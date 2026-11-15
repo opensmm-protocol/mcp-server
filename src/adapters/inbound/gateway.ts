@@ -39,6 +39,7 @@ Default state file:
 
 Environment variables (.env.example):
   PORT                            Listen port for the combined node (REST /v0 and MCP /mcp). Default 8080.
+  OPENSMM_ACCESS_LOG              JSON request log on stdout: 0 turns it off (default 1). One line per request, no bodies, headers or query.
   OPENSMM_STATE_FILE              Path to the JSON state snapshot (default: /data/opensmm-state.json; unset = in-memory only).
   OPENSMM_STATE_SAVE_MS           Autosave cadence of the state snapshot, milliseconds (default: 30000).
   OPENSMM_REST_V1_BASE_URL        Base URL of a live execution provider (reseller-style REST v1 API).
