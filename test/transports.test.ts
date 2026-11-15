@@ -1,15 +1,24 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
+import path from "node:path";
 import { after, before, describe, it } from "node:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { Ajv2020 } from "ajv/dist/2020.js";
 import { createDevStack } from "../src/bootstrap.ts";
 import { createRestHandler } from "../src/adapters/inbound/rest/handler.ts";
 import { createMcpServer } from "../src/adapters/inbound/mcp/server.ts";
 
 const SVC = "osmm_svc_tg_members_std";
 const LINK = "https://t.me/example_channel";
+
+// spec/v0 §5: both transports answer with the same canonical error body.
+const errorSchema = JSON.parse(
+  fs.readFileSync(path.resolve(import.meta.dirname, "../spec/v0/schemas/error.json"), "utf8"),
+);
+const validateError = new Ajv2020({ allErrors: true }).compile(errorSchema);
 
 describe("REST and MCP are one protocol", () => {
   let server: Server;
@@ -45,6 +54,15 @@ describe("REST and MCP are one protocol", () => {
   async function mcpCall(name: string, args: Record<string, unknown>): Promise<any> {
     const result = await mcpClient.callTool({ name, arguments: args });
     return result.structuredContent;
+  }
+
+  /** Payment intents attached to an order: a replay must never add a second one. */
+  function paymentIntentsFor(orderId: string) {
+    return stack.core.exportState().payments.filter((p) => p.orderId === orderId);
+  }
+
+  function assertCanonicalError(body: unknown): void {
+    assert.ok(validateError(body), JSON.stringify(validateError.errors));
   }
 
   it("capabilities match across transports", async () => {
@@ -116,6 +134,9 @@ describe("REST and MCP are one protocol", () => {
     });
     assert.equal(orderRest.status, 200);
     assert.equal(orderRest.body.orderId, orderMcp.orderId);
+    // No second charge: the replay reuses the original payment intent.
+    assert.equal(orderRest.body.paymentIntentId, orderMcp.paymentIntentId);
+    assert.equal(paymentIntentsFor(orderMcp.orderId).length, 1);
 
     // And the other way around: REST first, MCP replay second.
     const quoteRest = await rest("/v0/quotes", {
@@ -134,6 +155,70 @@ describe("REST and MCP are one protocol", () => {
       clientReference: "shared-key-2",
     });
     assert.equal(orderMcp2.orderId, orderRest2.body.orderId);
+    assert.equal(orderMcp2.paymentIntentId, orderRest2.body.paymentIntentId);
+    assert.equal(paymentIntentsFor(orderRest2.body.orderId).length, 1);
+  });
+
+  it("the same clientReference with a different body is IDEMPOTENCY_CONFLICT across transports", async () => {
+    // REST first, then MCP with the same key and different order parameters.
+    const restQuote = await rest("/v0/quotes", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ serviceId: SVC, quantity: 1000, link: LINK }),
+    });
+    const restOrder = await rest("/v0/orders", {
+      method: "POST",
+      headers: { "content-type": "application/json", "idempotency-key": "conflict-key-rest" },
+      body: JSON.stringify({ quoteId: restQuote.body.quoteId, link: LINK }),
+    });
+    assert.equal(restOrder.status, 402);
+
+    const mcpQuote = await mcpCall("get_quote", { serviceId: SVC, quantity: 2000, link: LINK });
+    const viaMcp: any = await mcpClient.callTool({
+      name: "create_order",
+      arguments: {
+        quoteId: mcpQuote.quoteId,
+        link: LINK,
+        quantity: 2000,
+        clientReference: "conflict-key-rest",
+      },
+    });
+    assert.equal(viaMcp.isError, true);
+    assertCanonicalError(viaMcp.structuredContent);
+    assert.equal(viaMcp.structuredContent.error.code, "IDEMPOTENCY_CONFLICT");
+    // The conflict creates nothing: one order, one payment intent.
+    assert.equal(paymentIntentsFor(restOrder.body.orderId).length, 1);
+    assert.equal(
+      (await rest(`/v0/orders/${restOrder.body.orderId}`)).body.paymentIntentId,
+      restOrder.body.paymentIntentId,
+    );
+
+    // MCP first, then REST with the same key sent as a body clientReference.
+    const mcpQuote2 = await mcpCall("get_quote", { serviceId: SVC, quantity: 500, link: LINK });
+    const mcpOrder = await mcpCall("create_order", {
+      quoteId: mcpQuote2.quoteId,
+      link: LINK,
+      clientReference: "conflict-key-mcp",
+    });
+    const restQuote2 = await rest("/v0/quotes", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ serviceId: SVC, quantity: 2000, link: LINK }),
+    });
+    const viaRest = await rest("/v0/orders", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        quoteId: restQuote2.body.quoteId,
+        link: LINK,
+        quantity: 2000,
+        clientReference: "conflict-key-mcp",
+      }),
+    });
+    assert.equal(viaRest.status, 409);
+    assertCanonicalError(viaRest.body);
+    assert.equal(viaRest.body.error.code, "IDEMPOTENCY_CONFLICT");
+    assert.equal(paymentIntentsFor(mcpOrder.orderId).length, 1);
   });
 
   it("MCP exposes exactly the 11 protocol tools", async () => {
