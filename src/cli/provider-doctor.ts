@@ -2,7 +2,8 @@
  * OpenSMM Provider Doctor (panel pre-onboarding Level-0 check).
  *
  * CLI usage:
- *   node src/cli/provider-doctor.ts --url https://panel.example/api/v2 --key KEY [--profile standard]
+ *   npm run doctor -- --url https://panel.example/api/v2 --key KEY [--profile standard]
+ *   node bin/opensmm.mjs doctor --url https://panel.example/api/v2 --key KEY [--profile standard]
  *
  * Performs read-only pre-onboarding diagnostics against an SMM API v2 endpoint:
  *   (1) HTTPS reachability + JSON vs HTML/Cloudflare detection
@@ -584,6 +585,10 @@ export function formatDoctorReport(result: DoctorResult): string {
   return lines.join("\n");
 }
 
+/** How an operator is expected to invoke the doctor (npm script or the CLI). */
+export const DOCTOR_USAGE = `Usage: opensmm doctor --url <url> --key <key> [--profile standard]
+       npm run doctor -- --url <url> --key <key> [--profile standard]`;
+
 /**
  * CLI execution handler.
  */
@@ -628,14 +633,14 @@ export async function runDoctorCli(
     };
   } catch (err: unknown) {
     errFn(`Error: ${err instanceof Error ? err.message : String(err)}`);
-    errFn("Usage: node src/cli/provider-doctor.ts --url <url> --key <key> [--profile standard]");
+    errFn(DOCTOR_USAGE);
     return 1;
   }
 
   const { values } = parsed;
 
   if (values.help) {
-    logFn("Usage: node src/cli/provider-doctor.ts --url <url> --key <key> [--profile standard]");
+    logFn(DOCTOR_USAGE);
     logFn("");
     logFn("Options:");
     logFn("  --url      Target provider API v2 endpoint (e.g. https://panel.example/api/v2) [required]");
@@ -647,7 +652,7 @@ export async function runDoctorCli(
 
   if (!values.url || !values.key) {
     errFn("Error: Missing required argument. Both --url and --key are required.");
-    errFn("Usage: node src/cli/provider-doctor.ts --url <url> --key <key> [--profile standard]");
+    errFn(DOCTOR_USAGE);
     return 1;
   }
 
