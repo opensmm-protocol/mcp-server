@@ -63,12 +63,27 @@ export interface Stack {
   stateFile?: StateFile;
 }
 
+export interface StackOptions {
+  /**
+   * Let the state file flush and exit on SIGINT/SIGTERM (default true).
+   * The gateway passes false: it drains connections and flushes the
+   * snapshot in its own orderly shutdown.
+   */
+  stateFileSignalExit?: boolean;
+}
+
 /**
  * When OPENSMM_STATE_FILE is set: restore orders/metrics/self-registered
  * nodes from the snapshot and start autosaving. The state file contains
  * provider credentials — it is written with mode 0600 (spec/v0 §10.3).
+ *
+ * `signalExit: false` leaves SIGINT/SIGTERM to the caller: the gateway
+ * drains connections and flushes the snapshot in its own shutdown path.
  */
-async function attachPersistence(core: OpenSmmCore): Promise<StateFile | undefined> {
+async function attachPersistence(
+  core: OpenSmmCore,
+  options: StackOptions = {},
+): Promise<StateFile | undefined> {
   const path = process.env.OPENSMM_STATE_FILE;
   if (!path) return undefined;
   const stateFile = new StateFile(path);
@@ -82,6 +97,7 @@ async function attachPersistence(core: OpenSmmCore): Promise<StateFile | undefin
   stateFile.startAutosave(
     () => core.exportState(),
     Number(process.env.OPENSMM_STATE_SAVE_MS ?? 30_000),
+    { signalExit: options.stateFileSignalExit ?? true },
   );
   return stateFile;
 }
@@ -200,6 +216,7 @@ export function createDevStack(): DevStack {
 
 export async function createStackFromEnv(
   overrides: Partial<CoreOptions> = {},
+  options: StackOptions = {},
 ): Promise<Stack> {
   const baseUrl = process.env.OPENSMM_REST_V1_BASE_URL;
   const apiKey = process.env.OPENSMM_REST_V1_API_KEY;
@@ -209,12 +226,12 @@ export async function createStackFromEnv(
     const payments = paymentsFromEnv();
     if (!payments.rails && !curated) {
       const dev = createDevStack();
-      const stateFile = await attachPersistence(dev.core);
+      const stateFile = await attachPersistence(dev.core, options);
       return { ...dev, ...(stateFile ? { stateFile } : {}) };
     }
     // Mock provider + real x402 payments: the testnet settlement shape.
     const stack = buildMockStack(payments, curated);
-    const stateFile = await attachPersistence(stack.core);
+    const stateFile = await attachPersistence(stack.core, options);
     return { ...stack, ...(stateFile ? { stateFile } : {}) };
   }
 
@@ -268,6 +285,6 @@ export async function createStackFromEnv(
   if (process.env.OPENSMM_SUPERVISOR !== "0") {
     supervisor.start();
   }
-  const stateFile = await attachPersistence(core);
+  const stateFile = await attachPersistence(core, options);
   return { core, provider, supervisor, ...(stateFile ? { stateFile } : {}) };
 }
