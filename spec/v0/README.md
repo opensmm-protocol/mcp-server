@@ -107,6 +107,7 @@ Canonical codes:
 | Code                  | Meaning |
 |-----------------------|---------|
 | `VALIDATION_FAILED`   | Request failed schema validation (HTTP 400). |
+| `PAYLOAD_TOO_LARGE`   | Request body above the gateway limit `OPENSMM_MAX_BODY_BYTES`; the read stopped, send a smaller body (HTTP 413). |
 | `NOT_FOUND`           | Unknown service/quote/order/payment (HTTP 404). |
 | `SERVICE_UNAVAILABLE` | Service disabled or not sellable (HTTP 409). |
 | `QUOTE_EXPIRED`       | `expiresAt` passed (HTTP 409). |
