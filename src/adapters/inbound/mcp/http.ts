@@ -8,14 +8,15 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { OpenSmmCore } from "../../../core/core.ts";
+import { OpenSmmError } from "../../../core/errors.ts";
+import { beginAccessLog } from "../access-log.ts";
+import { maxBodyBytesFromEnv, readBodyLimited } from "../body.ts";
 import { createMcpServer } from "./server.ts";
 
 const MCP_CORS_HEADERS = "content-type, mcp-protocol-version, mcp-session-id";
 
-async function readBody(req: IncomingMessage): Promise<unknown> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of req) chunks.push(chunk as Buffer);
-  const raw = Buffer.concat(chunks).toString("utf8").trim();
+async function readBody(req: IncomingMessage, maxBodyBytes: number): Promise<unknown> {
+  const raw = (await readBodyLimited(req, maxBodyBytes)).toString("utf8").trim();
   if (!raw) return undefined;
   return JSON.parse(raw);
 }
@@ -23,11 +24,13 @@ async function readBody(req: IncomingMessage): Promise<unknown> {
 export function createMcpHttpHandler(
   core: OpenSmmCore,
 ): (req: IncomingMessage, res: ServerResponse) => Promise<void> {
+  const maxBodyBytes = maxBodyBytesFromEnv();
   return async (req, res) => {
+    beginAccessLog(req, res);
     res.setHeader("access-control-allow-origin", "*");
     res.setHeader("access-control-allow-methods", "POST, OPTIONS");
     res.setHeader("access-control-allow-headers", MCP_CORS_HEADERS);
-    res.setHeader("access-control-expose-headers", "mcp-session-id");
+    res.setHeader("access-control-expose-headers", "mcp-session-id, x-request-id");
 
     const url = new URL(req.url ?? "/", "http://localhost");
     const path = url.pathname.replace(/\/+$/, "") || "/";
@@ -52,8 +55,19 @@ export function createMcpHttpHandler(
 
     let body: unknown;
     try {
-      body = await readBody(req);
-    } catch {
+      body = await readBody(req, maxBodyBytes);
+    } catch (err) {
+      // A capped body is a protocol error (413 PAYLOAD_TOO_LARGE), not a
+      // malformed JSON-RPC payload: answer with its canonical body.
+      if (err instanceof OpenSmmError) {
+        const payload = JSON.stringify(err.toBody());
+        res.writeHead(err.httpStatus, {
+          "content-type": "application/json",
+          "content-length": Buffer.byteLength(payload),
+        });
+        res.end(payload);
+        return;
+      }
       res.writeHead(400, { "content-type": "application/json" });
       res.end(JSON.stringify({ error: { code: "VALIDATION_FAILED", message: "request body is not valid JSON" } }));
       return;
