@@ -87,6 +87,34 @@ Caddy/nginx and as the container liveness probe. It reports the process, not
 the supply: the full check — catalog plus MCP `initialize` — stays with
 `npm run verify:node` and `npm run census`.
 
+## Rate limit
+
+Every client IP gets a sliding window of `OPENSMM_RATE_LIMIT_PER_MIN` requests
+per minute (default 120). REST `/v0` and MCP `/mcp` share one window, so a
+client cannot double its budget by switching transports. The N+1-th request
+inside the window is answered before it reaches core state:
+
+```bash
+curl -s -i http://localhost:8080/v0/services | head -3   # once over the limit
+# HTTP/1.1 429 Too Many Requests
+# retry-after: 12
+# {"error":{"code":"RATE_LIMITED","message":"too many requests from this IP",
+#           "details":{"retryAfterSeconds":12}}}
+```
+
+`retry-after` is in seconds — the time until the oldest request leaves the
+window. The body is the canonical error from `spec/v0/schemas/error.json`.
+`OPENSMM_RATE_LIMIT_PER_MIN=0` disables the limit.
+
+`GET /health` (and `OPTIONS`) never consume the window, so a monitor stays
+green while an agent is throttled.
+
+The client IP is the socket address. Behind your own reverse proxy every
+request arrives from the proxy, so set `OPENSMM_TRUST_PROXY=1` to take the
+first `x-forwarded-for` hop instead — only when that proxy overwrites the
+header (Caddy does; nginx needs `proxy_set_header X-Forwarded-For
+$remote_addr`), otherwise a client can spoof its own identity.
+
 ## Docker (optional)
 
 The supported Docker route today is a local build from this checkout. The
@@ -238,6 +266,8 @@ package-only.
 | `OPENSMM_SUPERVISOR` | `0` disables catalog-sync/poll supervision (default on for live providers). |
 | `OPENSMM_SYNC_INTERVAL_MS` / `OPENSMM_POLL_INTERVAL_MS` | Supervision cadence (defaults 5 min / 30 s). |
 | `OPENSMM_RETENTION_CHECK_MS` | Retention re-check delay (default 7 days). |
+| `OPENSMM_RATE_LIMIT_PER_MIN` | Requests per minute per client IP, sliding window, shared by REST and MCP (default 120; `0` disables). |
+| `OPENSMM_TRUST_PROXY` | `1` behind your own reverse proxy: take the client IP from `x-forwarded-for` (default 0). |
 
 ## Production checklist
 

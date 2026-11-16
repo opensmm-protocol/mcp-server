@@ -12,6 +12,7 @@ import { createServer, type Server } from "node:http";
 import path from "node:path";
 import { createStackFromEnv, type Stack } from "../../bootstrap.ts";
 import { createMcpHttpHandler } from "./mcp/http.ts";
+import { createRateLimiterFromEnv } from "./rate-limit.ts";
 import { createRestHandler } from "./rest/handler.ts";
 
 /** Grace period a stop waits for open connections before forcing them shut. */
@@ -54,6 +55,8 @@ Environment variables (.env.example):
   OPENSMM_SYNC_INTERVAL_MS        Supervision catalog sync cadence, milliseconds (default: 300000).
   OPENSMM_POLL_INTERVAL_MS        Supervision in-flight order polling cadence, milliseconds (default: 30000).
   OPENSMM_RETENTION_CHECK_MS      Supervision retention check cadence, milliseconds (default: 604800000).
+  OPENSMM_RATE_LIMIT_PER_MIN      Requests allowed per minute per client IP, sliding window (default: 120; 0 disables the limit).
+  OPENSMM_TRUST_PROXY             Set to 1 behind your own reverse proxy: take the client IP from x-forwarded-for (default: 0).
   OPENSMM_ALLOW_PRIVATE_ENDPOINTS Dev-only SSRF escape hatch: allow private/loopback provider endpoints (default: 0).
   X402_FACILITATOR_URL            URL of the x402 facilitator for real payment settlement.
   X402_PAYTO_ADDRESS              Direct-settlement payTo address for x402 payment rail.
@@ -100,8 +103,11 @@ export async function serveGateway(options: GatewayOptions = {}): Promise<Server
   const stack = await createStackFromEnv({}, { stateFileSignalExit: false });
   const { core, provider } = stack;
   const requestedPort = options.port ?? Number(process.env.PORT ?? 8080);
-  const rest = createRestHandler(core);
-  const mcp = createMcpHttpHandler(core);
+  // One limiter for both bindings: a client cannot double its budget by
+  // alternating between REST /v0 and MCP /mcp.
+  const rateLimiter = createRateLimiterFromEnv();
+  const rest = createRestHandler(core, { rateLimiter });
+  const mcp = createMcpHttpHandler(core, { rateLimiter });
 
   const server = createServer((req, res) => {
     const url = new URL(req.url ?? "/", "http://localhost");
