@@ -57,8 +57,9 @@ fi
 # No keys, no external services: the node must boot on the mock catalog alone.
 if ! docker run --detach --name "$CONTAINER" --publish "$PUBLISH" "$IMAGE" >/dev/null; then
   echo "smoke: FAIL: could not start ${IMAGE}" >&2
-  echo "smoke: if this is a ghcr image, the package may be private — anonymous pull" >&2
-  echo "smoke: must work (package visibility: public)." >&2
+  echo "smoke: if this is a ghcr image, the package is private: run" >&2
+  echo "smoke: 'docker login ghcr.io' with a token that has read:packages, then retry." >&2
+  echo "smoke: no ghcr access? Run the node from source (README, \"Run a node from source\")." >&2
   exit 1
 fi
 
