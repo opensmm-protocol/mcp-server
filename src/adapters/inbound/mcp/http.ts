@@ -9,6 +9,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { OpenSmmCore } from "../../../core/core.ts";
 import { OpenSmmError } from "../../../core/errors.ts";
+import { VERSION } from "../../../version.ts";
 import { beginAccessLog } from "../access-log.ts";
 import { maxBodyBytesFromEnv, readBodyLimited } from "../body.ts";
 import { createRateLimiterFromEnv, type PerIpRateLimiter } from "../rate-limit.ts";
@@ -107,7 +108,7 @@ export async function serveHttp(): Promise<Server> {
     });
   });
   await new Promise<void>((resolve) => server.listen(port, resolve));
-  console.error(`OpenSMM 0.1.0 MCP over HTTP listening on http://localhost:${port}/mcp (provider: ${provider.providerId})`);
+  console.error(`OpenSMM ${VERSION} MCP over HTTP listening on http://localhost:${port}/mcp (provider: ${provider.providerId})`);
   return server;
 }
 

@@ -10,6 +10,7 @@ import { Ajv2020 } from "ajv/dist/2020.js";
 import { createDevStack } from "../src/bootstrap.ts";
 import { createRestHandler } from "../src/adapters/inbound/rest/handler.ts";
 import { createMcpServer } from "../src/adapters/inbound/mcp/server.ts";
+import { VERSION } from "../src/version.ts";
 
 const SVC = "osmm_svc_tg_members_std";
 const LINK = "https://t.me/example_channel";
@@ -288,7 +289,7 @@ describe("REST and MCP are one protocol", () => {
       assert.equal(res.headers.get("access-control-allow-origin"), "*");
       const body = (await res.json()) as Record<string, unknown>;
       assert.equal(body.status, "ok");
-      assert.equal(body.version, "0.1.0");
+      assert.equal(body.version, VERSION);
       assert.equal(typeof body.uptime, "number");
     }
 

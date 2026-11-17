@@ -7,11 +7,10 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { z } from "zod";
 import type { OpenSmmCore } from "../../../core/core.ts";
 import { OpenSmmError, toErrorBody } from "../../../core/errors.ts";
+import { VERSION } from "../../../version.ts";
 import { beginAccessLog } from "../access-log.ts";
 import { maxBodyBytesFromEnv, readBodyLimited } from "../body.ts";
 import { createRateLimiterFromEnv, type PerIpRateLimiter } from "../rate-limit.ts";
-
-const NODE_VERSION = "0.1.0";
 
 const PLATFORM_VALUES = ["telegram", "instagram", "youtube", "tiktok", "x", "vk", "other"] as const;
 const OBJECTIVE_VALUES = ["followers", "members", "likes", "views", "reactions", "comments", "other"] as const;
@@ -108,7 +107,7 @@ export function createRestHandler(
       if (method === "GET" && (path === "/health" || path === "/v0/health")) {
         sendJson(res, 200, {
           status: "ok",
-          version: NODE_VERSION,
+          version: VERSION,
           uptime: process.uptime(),
         });
         return;
