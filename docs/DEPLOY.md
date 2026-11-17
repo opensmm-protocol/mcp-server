@@ -251,10 +251,12 @@ Caddy issues and renews the certificate automatically. Agents then connect
 to `https://mcp.opensmm.dev/mcp` (Streamable HTTP, stateless, CORS-open);
 REST is available on the same host under `/v0`.
 
-There is no MCP Registry entry: no package is published and there is no public
-hosted MCP endpoint, so the registry schema cannot describe this node. The node
-is installed from source (see «Run a node in 5 minutes» above). Details:
-[`REGISTRY.md`](./REGISTRY.md).
+The project has no MCP Registry entry: no package is published and OpenSMM hosts
+no public MCP endpoint of its own, so the registry schema cannot describe the
+project itself; OpenSMM is installed from source (see «Run a node in 5 minutes»
+above). A node an operator exposes like this is theirs to publish — schema
+`2025-12-11` describes it under `remotes` pointing at `https://mcp.opensmm.dev/mcp`.
+Details: [`REGISTRY.md`](./REGISTRY.md).
 
 ## Environment
 
