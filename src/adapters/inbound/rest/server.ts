@@ -3,6 +3,7 @@
 
 import { createServer } from "node:http";
 import { createStackFromEnv } from "../../../bootstrap.ts";
+import { VERSION } from "../../../version.ts";
 import { createRestHandler } from "./handler.ts";
 
 const port = Number(process.env.PORT ?? 3100);
@@ -12,6 +13,6 @@ const server = createServer((req, res) => {
 });
 
 server.listen(port, () => {
-  console.log(`OpenSMM 0.1.0 REST listening on http://localhost:${port}/v0 (provider: ${provider.providerId})`);
+  console.log(`OpenSMM ${VERSION} REST listening on http://localhost:${port}/v0 (provider: ${provider.providerId})`);
   console.log(`try: curl http://localhost:${port}/v0/capabilities`);
 });

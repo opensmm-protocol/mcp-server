@@ -11,6 +11,7 @@
 import { createServer, type Server } from "node:http";
 import path from "node:path";
 import { createStackFromEnv, type Stack } from "../../bootstrap.ts";
+import { VERSION } from "../../version.ts";
 import { createMcpHttpHandler } from "./mcp/http.ts";
 import { createRateLimiterFromEnv } from "./rate-limit.ts";
 import { createRestHandler } from "./rest/handler.ts";
@@ -124,7 +125,7 @@ export async function serveGateway(options: GatewayOptions = {}): Promise<Server
   const address = server.address();
   const port = typeof address === "object" && address ? address.port : requestedPort;
   console.error(
-    `OpenSMM 0.1.0 gateway listening on http://localhost:${port} ` +
+    `OpenSMM ${VERSION} gateway listening on http://localhost:${port} ` +
       `(REST /v0, MCP /mcp; provider: ${provider.providerId}` +
       `${provider.synthetic ? ", mock catalog — not real supply" : ""})`,
   );
