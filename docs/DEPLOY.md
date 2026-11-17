@@ -18,8 +18,8 @@ npm ci
 PORT=8080 OPENSMM_STATE_FILE=./opensmm-state.json npm run gateway
 ```
 
-The npm package that starts the same node without a checkout is not published
-yet (ZHC-303, README «Coming soon»), so a checkout is the only route today.
+There is no npm package and no public image: a checkout of this repository is
+the install source, and both routes below build the node from it.
 Every variable is commented in
 `.env.example`. To publish the node to agents, put TLS in front (section
 «TLS + public endpoint (Caddy)» below) and set `OPENSMM_PROVIDER_PAYOUT`,
@@ -117,10 +117,14 @@ $remote_addr`), otherwise a client can spoof its own identity.
 
 ## Docker (optional)
 
-The supported Docker route today is a local build from this checkout. The
-prebuilt image in the GitHub Container Registry is not public yet (ZHC-370,
-README «Coming soon»), so `docker-compose.yml` builds directly from the
-checkout.
+The Docker route is a local build from this checkout — `docker-compose.yml`
+builds directly from the repository, and there is no public image to pull.
+One command, from zero (Docker installed, nothing checked out):
+
+```bash
+git clone https://github.com/opensmm-protocol/mcp-server.git && cd mcp-server && docker build -t opensmm-gateway . && docker run -d --name opensmm -p 127.0.0.1:8080:8080 -v opensmm-data:/data opensmm-gateway
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8080/v0/services   # 200
+```
 
 Build and start the node with Docker Compose:
 
@@ -183,8 +187,8 @@ docker run -d --name opensmm -p 127.0.0.1:8080:8080 -v opensmm-data:/data opensm
 ```
 
 `docker-compose.yml` builds the node locally from the checkout (`build: .`).
-Once the prebuilt image is public (ZHC-370, README «Coming soon»), it can be
-switched back to `image: ghcr.io/opensmm-protocol/gateway:latest`.
+The image belongs to the build, not to a registry: there is no public image to
+pull, and the gateway is not distributed that way.
 
 A node with a live provider that other people can reach must also set the
 payment rail: `-e X402_FACILITATOR_URL=https://x402.org/facilitator -e
@@ -192,10 +196,11 @@ X402_PAYTO_ADDRESS=0xYourUsdcBaseAddress`. Without `X402_FACILITATOR_URL`
 the gateway keeps the dev-only mock rail, which settles orders without any
 payment — every order then spends the operator's provider balance for free.
 
-Image tags once the registry is public: `latest` (default branch), `X.Y.Z`
-and `X.Y` (on a `vX.Y.Z` tag), `sha-<commit>` for every build. The image is
-`linux/amd64`. It is built from this repository's `Dockerfile` on every
-merge to `main` and on `v*` tags (`.github/workflows/publish.yml`);
+CI also builds that same `Dockerfile` into the project's own private package in
+the GitHub Container Registry on every merge to `main` and on `v*` tags
+(`.github/workflows/publish.yml`), `linux/amd64`, with tags `latest` (default
+branch), `X.Y.Z` and `X.Y` (on a `vX.Y.Z` tag) and `sha-<commit>`. That package
+is internal to the project — an operator's route is the local build above.
 `scripts/smoke-container.sh` runs a container end to end (catalog, MCP
 `initialize`, `tools/list`, order idempotency, providers). CI repeats the
 same smoke test on every pull request.
@@ -246,10 +251,12 @@ Caddy issues and renews the certificate automatically. Agents then connect
 to `https://mcp.opensmm.dev/mcp` (Streamable HTTP, stateless, CORS-open);
 REST is available on the same host under `/v0`.
 
-How agents discover OpenSMM (npm package, MCP Registry entry, weekly download
-metric) is documented in [`REGISTRY.md`](./REGISTRY.md). A gateway an operator
-deploys like this is not published to the registry: the public entry stays
-package-only.
+The project has no MCP Registry entry: no package is published and OpenSMM hosts
+no public MCP endpoint of its own, so the registry schema cannot describe the
+project itself; OpenSMM is installed from source (see «Run a node in 5 minutes»
+above). A node an operator exposes like this is theirs to publish — schema
+`2025-12-11` describes it under `remotes` pointing at `https://mcp.opensmm.dev/mcp`.
+Details: [`REGISTRY.md`](./REGISTRY.md).
 
 ## Environment
 

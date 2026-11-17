@@ -18,7 +18,7 @@ What it does differently:
 - Direct settlement is canonical: orders carry x402 payment requirements (USDC on Base) with the provider's own payout address as payTo. A gateway routes and measures; it never custodies funds.
 
 Repo: https://github.com/opensmm-protocol/mcp-server (spec + reference gateway, 86 tests, MIT)
-Run it from source: `git clone https://github.com/opensmm-protocol/mcp-server.git && cd mcp-server && npm ci && npm run gateway` (npm package not published yet)
+Run it from source: `git clone https://github.com/opensmm-protocol/mcp-server.git && cd mcp-server && npm ci && npm run gateway` (no npm package — the checkout is the install)
 
 Happy to answer questions about the x402 flow, the provider SPI, or why payment and execution are separate state machines.
 
@@ -36,7 +36,7 @@ Repo: https://github.com/opensmm-protocol/mcp-server
 - Direct settlement: agents pay providers in USDC on Base via x402; the gateway never touches funds
 - Spec-first: JSON Schemas for every model, 8 runnable examples, 86 tests
 
-Agents can run it as an MCP server from source: `git clone https://github.com/opensmm-protocol/mcp-server.git && cd mcp-server && npm ci && npm run gateway` (npm package not published yet).
+Agents can run it as an MCP server from source: `git clone https://github.com/opensmm-protocol/mcp-server.git && cd mcp-server && npm ci && npm run gateway` (no npm package — the checkout is the install).
 Feedback welcome — especially on the spec (spec/v0) and the provider SPI.
 
 ## X/Twitter thread (3 posts)
