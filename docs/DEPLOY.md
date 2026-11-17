@@ -288,10 +288,10 @@ Details: [`REGISTRY.md`](./REGISTRY.md).
 
 ## Release version and tag
 
-The release version has one source: `version` in `package.json`. `src/version.ts`
-(banners, `/health`, MCP `serverInfo`) and `server.json` (registry manifest) repeat
-it, and `npm test` fails when any of them drifts — a bump is one edit plus
-`npm run manifests:sync`.
+The release version has one source: `version` in `package.json`. A bump touches
+`package.json`, `src/version.ts` and both `version` fields of `server.json`; then
+`npm run manifests:sync` mirrors `server.json` into `mcp.json` and
+`website/mcp.json`. `npm test` fails when any of these values drift.
 
 A tag `vX.Y.Z` marks the merge commit of a release and does not depend on
 publishing: when the tag and the package version differ, `registry-publish.yml`
