@@ -371,22 +371,19 @@ Key properties (enforced by tests):
 
 ## How agents find us
 
-Four entry points, any of them leads to the same server:
+Three entry points, any of them leads to the same server:
 
 - **Source checkout** — `git clone … && npm ci && npm run gateway` (or the
   Docker one-liner above). No npm package exists: the checkout is the install.
-- **MCP Registry** — `io.github.opensmm-protocol/mcp-server`, searchable at
-  `https://registry.modelcontextprotocol.io/v0/servers?search=opensmm`.
 - **`llms.txt`** — [`llms.txt`](./llms.txt) is the compact machine-readable
   summary of the protocol, the tools and the docs.
 - **Website** — <https://opensmm.dev> for the human-facing view of the same
   material.
 
-There is no public remote MCP endpoint yet: the registry entry is
-package-only, and agents run the package locally over `stdio`.
-
-How the registry entry is built, updated and verified — including the weekly
-download metric — is documented in [`docs/REGISTRY.md`](./docs/REGISTRY.md).
+There is no MCP Registry entry and none can appear until there is a published
+package or a public hosted endpoint; the node is installed from source — see
+[Run a node from source in 5 minutes](#run-a-node-from-source-in-5-minutes).
+Details: [`docs/REGISTRY.md`](./docs/REGISTRY.md).
 
 ## Roadmap
 
