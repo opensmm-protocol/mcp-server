@@ -3,9 +3,8 @@
 # State lives on the named volume (orders, metrics, node registrations).
 services:
   gateway:
-    # Source-only build until the prebuilt image is public (ZHC-370).
-    # Once public, replace `build: .` with:
-    # image: ghcr.io/opensmm-protocol/gateway:latest
+    # Built from this checkout: the source build is the permanent Docker route,
+    # there is no public image to pull.
     build: .
     restart: unless-stopped
     environment:

@@ -8,7 +8,7 @@
 
 ## Key facts for agents
 
-- Install: from source — `git clone https://github.com/opensmm-protocol/mcp-server.git && cd mcp-server && npm ci && npm run gateway` (REST /v0 + MCP /mcp on :8080, Node.js >= 22.18, no API key needed). npm package `npx -y @opensmm/mcp-server` — not published yet (ZHC-303). MCP Registry entry: io.github.opensmm-protocol/mcp-server,
+- Install: from source — `git clone https://github.com/opensmm-protocol/mcp-server.git && cd mcp-server && npm ci && npm run gateway` (REST /v0 + MCP /mcp on :8080, Node.js >= 22.18, no API key needed); Docker from the same checkout — `git clone https://github.com/opensmm-protocol/mcp-server.git && cd mcp-server && docker build -t opensmm-gateway . && docker run -d --name opensmm -p 127.0.0.1:8080:8080 -v opensmm-data:/data opensmm-gateway`. No npm package and no public image exist, none is planned: the checkout is the install source. MCP Registry entry: io.github.opensmm-protocol/mcp-server,
   search https://registry.modelcontextprotocol.io/v0/servers?search=opensmm.
   No public remote endpoint yet: run the node locally.
 - Public node without a domain (quick tunnel): expose local node with Cloudflare quick tunnel and verify with `npm run verify:node -- <https-url>` — docs/NODES.md («Public URL without a custom domain»).
