@@ -57,8 +57,9 @@ Execution providers        ← SMM API v2 panels, native providers, ...
 
 ## Run a node from source in 5 minutes
 
-The only required way to run a node today — a checkout of this repository and
-Node.js ≥ 22.18, nothing else:
+There is one install source — a checkout of this repository. With Node.js
+≥ 22.18 that is all you need; the Docker one-liner right below builds the same
+node from the same checkout.
 
 ```bash
 git clone https://github.com/opensmm-protocol/mcp-server.git
@@ -108,18 +109,29 @@ Need a public URL without setting up a domain or Caddy first? See
 > The same operation through REST and MCP produces the same domain objects.
 > Same `clientReference` → same `orderId`, on any transport.
 
-## Coming soon
+## Install routes: from source, and Docker from the same source
 
-Two more install routes are planned and **not available yet**:
+There is no npm package and no public container image for this gateway, and
+none is planned — a node is installed from this repository. Two equivalent
+routes start the same node (same REST `/v0`, same MCP `/mcp`, same mock
+catalog):
 
-- npm package `@opensmm/mcp-server` — tracked in ZHC-303;
-- container image `ghcr.io/opensmm-protocol/gateway` — tracked in ZHC-370.
+- **From source** — the `git clone … && npm run gateway` block above.
+- **Docker** — one command, from zero (nothing checked out yet); Docker builds
+  the image from the same sources:
 
-Both start the same node as the source route above: same REST `/v0`, same MCP
-`/mcp`, same mock catalog. They only remove the checkout step. Until they are
-published, the source route is the only supported way to start a node, so this
-section contains no commands. Operators who need Docker today build the image
-from a checkout — see [`docs/DEPLOY.md`](./docs/DEPLOY.md).
+```bash
+git clone https://github.com/opensmm-protocol/mcp-server.git && cd mcp-server && docker build -t opensmm-gateway . && docker run -d --name opensmm -p 127.0.0.1:8080:8080 -v opensmm-data:/data opensmm-gateway
+```
+
+The node answers within a few seconds — the check that it is up:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8080/v0/services   # 200
+```
+
+Docker details — `docker compose`, state on the volume, healthcheck, systemd,
+TLS: [`docs/DEPLOY.md`](./docs/DEPLOY.md).
 
 ## Local development
 
@@ -191,8 +203,8 @@ checkout:
 
 (run `npm run build` once in the checkout — the entry point runs `dist/`,
 because Node refuses TypeScript type stripping inside `node_modules`).
-When the npm package is published, the same config works without a checkout —
-see «Coming soon» above.
+There is no npm package to install instead: the config always points at a
+checkout, which is the only install route.
 
 Tools: `get_capabilities`, `list_providers`, `register_provider`,
 `search_services`, `compare_offers`, `get_service`, `get_quote`, `create_order`,
@@ -361,8 +373,8 @@ Key properties (enforced by tests):
 
 Four entry points, any of them leads to the same server:
 
-- **npm** — planned, not published yet (ZHC-303, see «Coming soon» above).
-  Until then the same node runs from source: `git clone … && npm ci && npm run gateway`.
+- **Source checkout** — `git clone … && npm ci && npm run gateway` (or the
+  Docker one-liner above). No npm package exists: the checkout is the install.
 - **MCP Registry** — `io.github.opensmm-protocol/mcp-server`, searchable at
   `https://registry.modelcontextprotocol.io/v0/servers?search=opensmm`.
 - **`llms.txt`** — [`llms.txt`](./llms.txt) is the compact machine-readable
