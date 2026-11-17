@@ -10,6 +10,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import type { OpenSmmCore } from "../../../core/core.ts";
 import { toErrorBody } from "../../../core/errors.ts";
+import { VERSION } from "../../../version.ts";
 
 type ToolResult = {
   content: { type: "text"; text: string }[];
@@ -35,7 +36,7 @@ function fail(err: unknown): ToolResult {
 
 export function createMcpServer(core: OpenSmmCore): McpServer {
   const server = new McpServer(
-    { name: "opensmm", version: "0.1.0" },
+    { name: "opensmm", version: VERSION },
     { capabilities: { tools: {} } },
   );
 
@@ -301,7 +302,7 @@ export async function serveStdio(): Promise<void> {
   const { core, provider } = await createStackFromEnv();
   const server = createMcpServer(core);
   await server.connect(new StdioServerTransport());
-  console.error(`OpenSMM 0.1.0 MCP server running on stdio (provider: ${provider.providerId})`);
+  console.error(`OpenSMM ${VERSION} MCP server running on stdio (provider: ${provider.providerId})`);
 }
 
 const isMain = process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, "/"));

@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: release
     outputs:
-      published: ${{ steps.token.outputs.present }}
+      published: ${{ steps.release.outputs.publish == 'true' && steps.token.outputs.present == 'true' }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -39,30 +39,14 @@ jobs:
 
       - name: Verify release tag matches the package version
         id: release
-        run: |
-          set -euo pipefail
-          if [ "${GITHUB_REF_TYPE}" != "tag" ] || [ "${GITHUB_REF_NAME#v}" = "${GITHUB_REF_NAME}" ]; then
-            echo "::error::Publishing runs only from a v* tag; got ${GITHUB_REF}."
-            exit 1
-          fi
-          tag_version="${GITHUB_REF_NAME#v}"
-          pkg_version="$(node -p "require('./package.json').version")"
-          manifest_version="$(node -p "require('./server.json').version")"
-          if [ "${tag_version}" != "${pkg_version}" ]; then
-            echo "::error::Tag ${GITHUB_REF_NAME} does not match package.json version ${pkg_version}."
-            exit 1
-          fi
-          if [ "${manifest_version}" != "${pkg_version}" ]; then
-            echo "::error::server.json version ${manifest_version} does not match package.json version ${pkg_version}."
-            exit 1
-          fi
-          echo "version=${pkg_version}" >> "$GITHUB_OUTPUT"
+        run: node scripts/check-release-version.mjs
 
       - name: Install dependencies
         run: npm ci
 
       - name: Check for NPM_TOKEN
         id: token
+        if: steps.release.outputs.publish == 'true'
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
@@ -75,7 +59,7 @@ jobs:
 
       - name: Check whether this version is already on npm
         id: existing
-        if: steps.token.outputs.present == 'true'
+        if: steps.release.outputs.publish == 'true' && steps.token.outputs.present == 'true'
         env:
           VERSION: ${{ steps.release.outputs.version }}
         run: |
@@ -88,7 +72,7 @@ jobs:
           fi
 
       - name: Publish to npm
-        if: steps.token.outputs.present == 'true' && steps.existing.outputs.exists != 'true'
+        if: steps.release.outputs.publish == 'true' && steps.token.outputs.present == 'true' && steps.existing.outputs.exists != 'true'
         run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

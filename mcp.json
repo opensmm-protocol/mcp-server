@@ -3,7 +3,7 @@
   "name": "io.github.opensmm-protocol/mcp-server",
   "title": "OpenSMM — SMM MCP server for social media growth",
   "description": "SMM MCP server: social media growth, Instagram growth, Telegram views, follower purchase.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "websiteUrl": "https://opensmm.dev",
   "repository": {
     "url": "https://github.com/opensmm-protocol/mcp-server",
@@ -13,7 +13,7 @@
     {
       "registryType": "npm",
       "identifier": "@opensmm/mcp-server",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"

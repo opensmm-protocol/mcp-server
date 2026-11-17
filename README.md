@@ -5,7 +5,7 @@
 > **Open, provider-neutral protocol for ordering and executing social media growth services by AI agents.**
 > MCP is one way to connect — not the product itself.
 
-**Status: `0.1.0` — first public release. The spec and reference gateway are
+**Status: `0.1.1` — first public release. The spec and reference gateway are
 feature-complete for v0 and covered by tests.**
 
 **Run a node:** [`docs/NODES.md`](./docs/NODES.md) (node checks, public URL) ·
@@ -71,7 +71,7 @@ npm run gateway
 The node reports its port on stderr:
 
 ```
-OpenSMM 0.1.0 gateway listening on http://localhost:8080 (REST /v0, MCP /mcp; provider: mock, mock catalog — not real supply)
+OpenSMM 0.1.1 gateway listening on http://localhost:8080 (REST /v0, MCP /mcp; provider: mock, mock catalog — not real supply)
 ```
 
 Check the node:

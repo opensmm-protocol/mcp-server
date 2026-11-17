@@ -17,6 +17,12 @@ const MIN_TIMEOUT_MS = 1000;
 const MAX_TIMEOUT_MS = 30000;
 const MAX_NODES = 20;
 
+// The census identifies itself in the MCP `initialize` handshake; its client
+// version follows the release version instead of repeating it as a literal.
+const CLIENT_VERSION = JSON.parse(
+  readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+).version;
+
 const USAGE = `usage: node scripts/node-census.mjs (--url <url> | --file <path>)... [--timeout <ms>]
   --url <url>     gateway base URL, repeatable
   --file <path>   file with one URL per line ("#" starts a comment line)
@@ -205,7 +211,7 @@ export async function censusNode(baseUrl, options = {}) {
           params: {
             protocolVersion: "2025-06-18",
             capabilities: {},
-            clientInfo: { name: "opensmm-node-census", version: "0.1.0" },
+            clientInfo: { name: "opensmm-node-census", version: CLIENT_VERSION },
           },
         },
         controller.signal,

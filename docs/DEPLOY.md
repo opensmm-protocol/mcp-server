@@ -28,7 +28,7 @@ so that the orders of this node carry your payout address.
 The node reports its port on stderr:
 
 ```
-OpenSMM 0.1.0 gateway listening on http://localhost:8080 (REST /v0, MCP /mcp; provider: mock, mock catalog — not real supply)
+OpenSMM 0.1.1 gateway listening on http://localhost:8080 (REST /v0, MCP /mcp; provider: mock, mock catalog — not real supply)
 ```
 
 Check the node:
@@ -75,7 +75,7 @@ curl -s http://localhost:8080/health
 ```json
 {
   "status": "ok",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "uptime": 12.345
 }
 ```
@@ -285,3 +285,17 @@ Details: [`REGISTRY.md`](./REGISTRY.md).
 - [ ] TLS in front (Caddy or Cloudflare).
 - [ ] `OPENSMM_ALLOW_PRIVATE_ENDPOINTS` unset — it is the dev SSRF escape hatch.
 - [ ] Firewall: only 80/443 inbound; the gateway listens on 127.0.0.1.
+
+## Release version and tag
+
+The release version has one source: `version` in `package.json`. A bump touches
+`package.json`, `src/version.ts` and both `version` fields of `server.json`; then
+`npm run manifests:sync` mirrors `server.json` into `mcp.json` and
+`website/mcp.json`. `npm test` fails when any of these values drift.
+
+A tag `vX.Y.Z` marks the merge commit of a release and does not depend on
+publishing: when the tag and the package version differ, `registry-publish.yml`
+skips npm and the registry with a notice and the run stays green. The release
+manager orders the bump in the release card of the window and a coder ships it as
+a separate PR before the release; a release without a bump still ships, but gets
+no new tag.
