@@ -18,6 +18,7 @@ const USAGE = `Usage: opensmm [command]
 
 Commands:
   (none)                 MCP server over stdio (default; keep the old behaviour)
+  mcp                    MCP server over stdio (explicit; used by Dockerfile.mcp)
   gateway [options]      One OpenSMM node: REST /v0 and MCP /mcp on one port
   doctor [options]       Read-only pre-onboarding check of an SMM API v2 panel
 
@@ -78,7 +79,7 @@ function parseGatewayArgs(args) {
 async function main(argv) {
   const [command, ...rest] = argv;
 
-  if (command === undefined) {
+  if (command === undefined || command === "mcp") {
     const { serveStdio } = await loadModule("adapters/inbound/mcp/server");
     await serveStdio();
     return;

@@ -1,0 +1,36 @@
+# OpenSMM MCP server over stdio (`opensmm mcp`) for MCP catalogs: no port, no volume.
+# Same build as ./Dockerfile; run with `docker run -i --rm <image>`.
+# node_modules of the published package reject TypeScript type stripping, so the
+# image ships the compiled `dist/` and the plain-JS entry point from `bin/`.
+
+FROM node:24-alpine AS build
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY tsconfig.json tsconfig.build.json ./
+COPY src ./src
+RUN npm run build
+
+FROM node:24-alpine
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev && npm cache clean --force
+
+COPY --from=build /app/dist ./dist
+COPY bin ./bin
+COPY spec ./spec
+COPY llms.txt mcp.json README.md LICENSE ./
+
+USER node
+
+# stdio only: JSON-RPC on stdin/stdout, logs on stderr. Boots on the mock catalog;
+# provider/payment env (OPENSMM_*) override the defaults.
+ENTRYPOINT ["node"]
+CMD ["bin/opensmm.mjs", "mcp"]
