@@ -130,6 +130,12 @@ The node answers within a few seconds — the check that it is up:
 curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8080/v0/services   # 200
 ```
 
+MCP over stdio (for MCP clients and catalogs that launch a container; no port):
+
+```bash
+docker build -f Dockerfile.mcp -t opensmm-mcp . && docker run -i --rm opensmm-mcp
+```
+
 Docker details — `docker compose`, state on the volume, healthcheck, systemd,
 TLS: [`docs/DEPLOY.md`](./docs/DEPLOY.md).
 
