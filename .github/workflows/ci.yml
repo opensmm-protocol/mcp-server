@@ -59,3 +59,30 @@ jobs:
         env:
           SMOKE_IMAGE: opensmm-gateway:ci
         run: scripts/smoke-container.sh
+
+  mcp-stdio:
+    name: Build Dockerfile.mcp and smoke MCP over stdio
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      # The image is built for the check only and is never pushed.
+      - name: Build the MCP stdio image
+        run: docker build -f Dockerfile.mcp -t opensmm-mcp .
+
+      - name: Smoke initialize and tools/list over stdio
+        run: |
+          set -euo pipefail
+          {
+            printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"ci","version":"0"}}}'
+            printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
+            printf '%s\n' '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
+          } | timeout 60 docker run -i --rm opensmm-mcp | tee mcp-stdio.out
+          for id in 1 2; do
+            line=$(grep -E "\"id\":$id[,}]" mcp-stdio.out || true)
+            case "$line" in
+              *'"result"'*) echo "id=$id: result OK" ;;
+              *) echo "id=$id: no result in response" >&2; exit 1 ;;
+            esac
+          done
