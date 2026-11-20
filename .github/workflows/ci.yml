@@ -55,6 +55,9 @@ jobs:
       - name: Build the gateway image
         run: docker build --tag opensmm-gateway:ci .
 
+      - name: Report image size
+        run: docker image ls opensmm-gateway:ci
+
       - name: Run the container smoke test
         env:
           SMOKE_IMAGE: opensmm-gateway:ci
@@ -69,7 +72,7 @@ jobs:
 
       # The image is built for the check only and is never pushed.
       - name: Build the MCP stdio image
-        run: docker build -f Dockerfile.mcp -t opensmm-mcp .
+        run: docker build -f Dockerfile.mcp -t opensmm-mcp . && docker image ls opensmm-mcp
 
       - name: Smoke initialize and tools/list over stdio
         run: |
