@@ -53,7 +53,7 @@ jobs:
       # publishes the image: build locally, then smoke the same steps an
       # operator runs after `docker pull`.
       - name: Build the gateway image
-        run: docker build --tag opensmm-gateway:ci .
+        run: docker build --tag opensmm-gateway:ci . && docker image ls opensmm-gateway:ci
 
       - name: Run the container smoke test
         env:
@@ -69,7 +69,7 @@ jobs:
 
       # The image is built for the check only and is never pushed.
       - name: Build the MCP stdio image
-        run: docker build -f Dockerfile.mcp -t opensmm-mcp .
+        run: docker build -f Dockerfile.mcp -t opensmm-mcp . && docker image ls opensmm-mcp
 
       - name: Smoke initialize and tools/list over stdio
         run: |
