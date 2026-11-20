@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "opensmm": {
+      "command": "npm",
+      "args": ["run", "mcp"],
+      "cwd": "/path/to/mcp-server"
+    }
+  }
+}

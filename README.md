@@ -10,7 +10,9 @@ feature-complete for v0 and covered by tests.**
 
 **Run a node:** [`docs/NODES.md`](./docs/NODES.md) (node checks, public URL) ·
 [`docs/DEPLOY.md`](./docs/DEPLOY.md) (Docker, TLS, state).
-**For AI agents:** start with [`llms.txt`](./llms.txt).
+**For AI agents:** start with [`llms.txt`](./llms.txt), then the
+[5-minute guide](./docs/AGENT_QUICKSTART.md) — order an SMM service from an
+agent over Claude Desktop, Cursor, LangChain or n8n.
 **For supply nodes:** [`docs/PROVIDER_ONBOARDING.md`](./docs/PROVIDER_ONBOARDING.md) —
 zero-code registration, including a copy-paste prompt for your AI assistant.
 
@@ -94,7 +96,13 @@ live catalog appears only after you connect a provider (see
 the census tool: [`docs/NODES.md`](./docs/NODES.md).
 
 How an agent orders from that node, over REST and over MCP, with the
-idempotent replay: [`examples/`](./examples/README.md).
+idempotent replay: [`examples/`](./examples/README.md). The
+[5-minute guide](./docs/AGENT_QUICKSTART.md) walks the whole
+catalog → quote → order → replay scenario from a clean clone; ready configs
+and workflows live in [`examples/claude-desktop/`](./examples/claude-desktop/README.md),
+[`examples/cursor/`](./examples/cursor/README.md),
+[`examples/langchain/`](./examples/langchain/README.md) and
+[`examples/n8n/`](./examples/n8n/README.md).
 
 Troubleshooting common startup issues (port conflict, Node version, state file permissions, offline npm ci, mock catalog):
 [`docs/TROUBLESHOOTING.md`](./docs/TROUBLESHOOTING.md).
