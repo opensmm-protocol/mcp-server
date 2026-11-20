@@ -16,6 +16,17 @@ agent over Claude Desktop, Cursor, LangChain or n8n.
 **For supply nodes:** [`docs/PROVIDER_ONBOARDING.md`](./docs/PROVIDER_ONBOARDING.md) —
 zero-code registration, including a copy-paste prompt for your AI assistant.
 
+## Install / Connect
+
+```bash
+git clone https://github.com/opensmm-protocol/mcp-server.git
+cd mcp-server && npm ci && npm run gateway   # REST + MCP on a local node
+```
+
+Connect Claude Desktop, Cursor, LangChain or n8n in 5 minutes:
+[`docs/AGENT_QUICKSTART.md`](./docs/AGENT_QUICKSTART.md). Machine-readable
+entry point: [`llms.txt`](./llms.txt).
+
 ## What this is
 
 OpenSMM separates three concerns that classic SMM panels merge into one:

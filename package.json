@@ -13,6 +13,7 @@
     "mcp-server",
     "model-context-protocol",
     "ai-agents",
+    "open-protocol",
     "llm-tools",
     "agent-economy",
     "smm",
