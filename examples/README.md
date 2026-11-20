@@ -128,6 +128,25 @@ Connects over Streamable HTTP to a running gateway (`npm run gateway` on `:8080`
 }
 ```
 
+### Connect from a specific agent stack
+
+Ready-to-copy examples for four agent stacks — each runs against the same
+local node and its mock catalog, with no keys or money:
+
+- [Claude Desktop](claude-desktop/README.md) — stdio via
+  [`claude_desktop_config.json`](claude-desktop/claude_desktop_config.json)
+  (`npm run mcp`).
+- [Cursor](cursor/README.md) — HTTP `POST /mcp` via
+  [`.cursor/mcp.json`](cursor/.cursor/mcp.json) (`npm run gateway`).
+- [LangChain-style agent](langchain/README.md) — a runnable
+  [tool-calling script](langchain/agent.mjs): catalog → quote → order → replay.
+- [n8n](n8n/README.md) — an importable
+  [workflow](n8n/workflow.json) with HTTP Request nodes and a mock-only guard.
+
+The short end-to-end walkthrough is
+[`docs/AGENT_QUICKSTART.md`](../docs/AGENT_QUICKSTART.md) — «заказ SMM-услуги из
+агента за 5 минут» from a clean clone.
+
 ### What the scripts talk to
 
 | Script | Path | Calls |
