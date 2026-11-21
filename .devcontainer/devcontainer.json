@@ -1,0 +1,11 @@
+{
+  "name": "OpenSMM gateway node",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
+  "postCreateCommand": "npm ci",
+  "forwardPorts": [8080],
+  "customizations": {
+    "vscode": {
+      "extensions": []
+    }
+  }
+}
