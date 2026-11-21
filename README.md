@@ -72,7 +72,9 @@ Execution providers        ← SMM API v2 panels, native providers, ...
 
 There is one install source — a checkout of this repository. With Node.js
 ≥ 22.18 that is all you need; the Docker one-liner right below builds the same
-node from the same checkout.
+node from the same checkout. No local Node.js, Docker or domain? Open the repo
+in GitHub Codespaces — the devcontainer installs dependencies and forwards
+port 8080: [`docs/CODESPACES.md`](./docs/CODESPACES.md).
 
 ```bash
 git clone https://github.com/opensmm-protocol/mcp-server.git
