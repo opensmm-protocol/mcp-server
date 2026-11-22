@@ -88,7 +88,7 @@ transport.
 Run without `--quote` and the MCP client prices a new quote itself (useful on
 its own; it cannot reuse an order that was made from a different quote).
 
-### 5. Connect a node to an MCP client (Подключить узел к MCP-клиенту)
+### 5. Connect a node to an MCP client
 
 To use your node from Claude Desktop, Cursor, or any MCP-compatible client, add
 one of the following configuration blocks to your client's settings
@@ -147,8 +147,8 @@ local node and its mock catalog, with no keys or money:
   [workflow](n8n/workflow.json) with HTTP Request nodes and a mock-only guard.
 
 The short end-to-end walkthrough is
-[`docs/AGENT_QUICKSTART.md`](../docs/AGENT_QUICKSTART.md) — «заказ SMM-услуги из
-агента за 5 минут» from a clean clone.
+[`docs/AGENT_QUICKSTART.md`](../docs/AGENT_QUICKSTART.md) — order an SMM service
+from an agent in 5 minutes, from a clean clone.
 
 ### What the scripts talk to
 

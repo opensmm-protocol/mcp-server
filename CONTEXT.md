@@ -58,3 +58,7 @@ No linter is configured; `npm test` + `npm run typecheck` are the gate
 - Before a PR: `npm test` and `npm run typecheck` green.
 - Spec changes (`spec/v0/`) require matching updates to
   `test/spec-examples.test.ts` fixtures.
+
+## Language
+
+English only, everywhere, no exceptions: code, comments, docs, commit messages, branch names, PR titles and descriptions, review comments, and every public text (website, `llms.txt`, `server.json`, registry and catalog listings, npm and ghcr metadata). CI runs `node scripts/check-english.mjs` and fails on any Cyrillic in tracked files; write source-language literals that the code must match as `\uXXXX` escapes.
