@@ -7,7 +7,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
-const CYRILLIC = /[Ѐ-ӿ]/;
+const CYRILLIC = /[\u0400-\u04ff]/;
 
 const files = execFileSync("git", ["ls-files", "-z"], {
   encoding: "utf8",
