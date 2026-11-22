@@ -110,7 +110,7 @@ describe("scripts/node-census.mjs", () => {
     assert.equal(nodes[0]!.services, 1);
     assert.equal(nodes[0]!.providers, 1);
     assert.equal(nodes[0]!.initialize, true);
-    assert.match(stderr, /1 узел: 1 up, 0 down/);
+    assert.match(stderr, /1 node: 1 up, 0 down/);
   });
 
   it("reports a closed port as down and still exits 0", async () => {
@@ -144,7 +144,7 @@ describe("scripts/node-census.mjs", () => {
     const { code, nodes, stderr } = await census("--url", mock.baseUrl, "--url", mock.baseUrl);
     assert.equal(code, 0);
     assert.equal(nodes.length, 1);
-    assert.match(stderr, /1 узел: 1 up, 0 down/);
+    assert.match(stderr, /1 node: 1 up, 0 down/);
   });
 
   it("accepts a custom --timeout on a responding node", async () => {

@@ -1,8 +1,10 @@
 /**
- * RU→EN translation for legacy SMM catalog entries.
+ * Source-language to English translation for legacy SMM catalog entries.
+ * Source-language literals are written as \uXXXX escapes so the repository
+ * stays free of non-English text.
  *
- * Upstream catalogs ship Russian templated names like
- *   "Telegram / ᴛɢ | Подписчики | 🇷🇺 Россия | ♻ 30 | ❎"
+ * Upstream catalogs ship templated names like
+ *   "Telegram / ᴛɢ | <Subscribers> | <flag> <Country> | ♻ 30 | ❎"
  * The segments are highly repetitive, so a phrase dictionary + pattern
  * rules + word-level fallback + transliteration covers them deterministically.
  *
@@ -21,7 +23,7 @@ const PLATFORM_PREFIXES = new Map(Object.entries({
   "facebook": "Facebook",
   "kick": "Kick",
   "rutube": "Rutube",
-  "вконтакте": "VK",
+  "\u0432\u043a\u043e\u043d\u0442\u0430\u043a\u0442\u0435": "VK",
   "x (twitter)": "X (Twitter)",
   "twitter": "X (Twitter)",
   "shopee": "Shopee",
@@ -31,15 +33,15 @@ const PLATFORM_PREFIXES = new Map(Object.entries({
   "tripadvisor": "Tripadvisor",
   "soundcloud": "SoundCloud",
   "discord": "Discord",
-  "vk видео live": "VK Video Live",
-  "яндекс дзен": "Yandex Zen",
-  "яндекс маркет": "Yandex Market",
-  "яндекс": "Yandex",
+  "vk \u0432\u0438\u0434\u0435\u043e live": "VK Video Live",
+  "\u044f\u043d\u0434\u0435\u043a\u0441 \u0434\u0437\u0435\u043d": "Yandex Zen",
+  "\u044f\u043d\u0434\u0435\u043a\u0441 \u043c\u0430\u0440\u043a\u0435\u0442": "Yandex Market",
+  "\u044f\u043d\u0434\u0435\u043a\u0441": "Yandex",
   "chaturbate": "Chaturbate",
-  "одноклассники": "Odnoklassniki",
+  "\u043e\u0434\u043d\u043e\u043a\u043b\u0430\u0441\u0441\u043d\u0438\u043a\u0438": "Odnoklassniki",
   "whatsapp": "WhatsApp",
   "reddit": "Reddit",
-  "авито": "Avito",
+  "\u0430\u0432\u0438\u0442\u043e": "Avito",
   "github": "GitHub",
   "behance": "Behance",
   "kwai": "Kwai",
@@ -59,24 +61,24 @@ const PLATFORM_PREFIXES = new Map(Object.entries({
   "quora": "Quora",
   "apple podcast": "Apple Podcast",
   "max": "MAX",
-  "для сайтов": "Website traffic",
-  "крипта": "Crypto",
-  "игры и дополнения": "Games & add-ons",
+  "\u0434\u043b\u044f \u0441\u0430\u0439\u0442\u043e\u0432": "Website traffic",
+  "\u043a\u0440\u0438\u043f\u0442\u0430": "Crypto",
+  "\u0438\u0433\u0440\u044b \u0438 \u0434\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u044f": "Games & add-ons",
   "pornhub": "PornHub",
   "bongacams": "BongaCams",
 }));
 
-/** "Telegram / ᴛɢ" → "Telegram"; "Игры и дополнения / sᴛᴇᴀᴍ" → "Steam games" */
+/** "Telegram / ᴛɢ" → "Telegram"; "<Games and add-ons> / sᴛᴇᴀᴍ" → "Steam games" */
 function translatePlatformPrefix(seg) {
   const m = seg.match(/^(.+?)\s*\/\s*([^\s/]+)$/u);
   if (!m) return null;
   const head = m[1].trim().toLowerCase();
   const sub = m[2].trim();
-  const base = PLATFORM_PREFIXES.get(head) ?? (!/[а-яё]/i.test(head) ? m[1].trim() : null);
+  const base = PLATFORM_PREFIXES.get(head) ?? (!/[\u0430-\u044f\u0451]/i.test(head) ? m[1].trim() : null);
   if (!base) return null;
   if (/^sᴛᴇᴀᴍ$/i.test(sub)) return "Steam games";
   if (/^xʙᴏx$/i.test(sub)) return "Xbox games";
-  if (/^ᴜʙɪsᴏғᴛ$/i.test(sub)) return "Ubisoft games";
+  if (/^ᴜʙɪsᴏ\u0493ᴛ$/i.test(sub)) return "Ubisoft games";
   if (/^ᴇᴀ$/i.test(sub)) return "EA games";
   return base;
 }
@@ -84,37 +86,37 @@ function translatePlatformPrefix(seg) {
 /* ---------- countries ---------- */
 
 const COUNTRIES = {
-  "россия": "Russia", "сша": "USA", "индия": "India", "турция": "Turkey",
-  "китай": "China", "индонезия": "Indonesia", "германия": "Germany",
-  "бразилия": "Brazil", "франция": "France", "италия": "Italy",
-  "казахстан": "Kazakhstan", "узбекистан": "Uzbekistan",
-  "великобритания": "UK", "израиль": "Israel", "испания": "Spain",
-  "япония": "Japan", "украина": "Ukraine", "египет": "Egypt",
-  "канада": "Canada", "нигерия": "Nigeria", "австралия": "Australia",
-  "таиланд": "Thailand", "мексика": "Mexico", "саудовская аравия": "Saudi Arabia",
-  "оаэ": "UAE", "тайвань": "Taiwan", "южная корея": "South Korea",
-  "аргентина": "Argentina", "малайзия": "Malaysia", "бангладеш": "Bangladesh",
-  "бельгия": "Belgium", "швейцария": "Switzerland", "греция": "Greece",
-  "вьетнам": "Vietnam", "беларусь": "Belarus", "австрия": "Austria",
-  "литва": "Lithuania", "венгрия": "Hungary", "финляндия": "Finland",
-  "чили": "Chile", "дания": "Denmark", "эстония": "Estonia",
-  "чехия": "Czechia", "хорватия": "Croatia", "мальта": "Malta",
-  "латвия": "Latvia", "европа": "Europe", "иран": "Iran",
-  "швеция": "Sweden", "португалия": "Portugal", "марокко": "Morocco",
-  "пакистан": "Pakistan", "колумбия": "Colombia", "грузия": "Georgia",
-  "албания": "Albania", "филиппины": "Philippines", "армения": "Armenia",
-  "тунис": "Tunisia", "катар": "Qatar", "польша": "Poland",
-  "алжир": "Algeria", "нидерланды": "Netherlands", "ирак": "Iraq",
-  "ирландия": "Ireland", "доминикана": "Dominican Republic",
-  "сербия": "Serbia", "болгария": "Bulgaria", "румыния": "Romania",
-  "мир": "Worldwide", "снг": "CIS",
-  "арабские страны": "Arab countries",
-  "азербайджан": "Azerbaijan", "киргизия": "Kyrgyzstan",
-  "таджикистан": "Tajikistan", "туркменистан": "Turkmenistan",
-  "монголия": "Mongolia", "непал": "Nepal", "шри ланка": "Sri Lanka",
-  "южная африка": "South Africa", "новая зеландия": "New Zealand",
-  "северная македония": "North Macedonia", "коста рика": "Costa Rica",
-  "пуэрто рико": "Puerto Rico", "сальвадор": "El Salvador",
+  "\u0440\u043e\u0441\u0441\u0438\u044f": "Russia", "\u0441\u0448\u0430": "USA", "\u0438\u043d\u0434\u0438\u044f": "India", "\u0442\u0443\u0440\u0446\u0438\u044f": "Turkey",
+  "\u043a\u0438\u0442\u0430\u0439": "China", "\u0438\u043d\u0434\u043e\u043d\u0435\u0437\u0438\u044f": "Indonesia", "\u0433\u0435\u0440\u043c\u0430\u043d\u0438\u044f": "Germany",
+  "\u0431\u0440\u0430\u0437\u0438\u043b\u0438\u044f": "Brazil", "\u0444\u0440\u0430\u043d\u0446\u0438\u044f": "France", "\u0438\u0442\u0430\u043b\u0438\u044f": "Italy",
+  "\u043a\u0430\u0437\u0430\u0445\u0441\u0442\u0430\u043d": "Kazakhstan", "\u0443\u0437\u0431\u0435\u043a\u0438\u0441\u0442\u0430\u043d": "Uzbekistan",
+  "\u0432\u0435\u043b\u0438\u043a\u043e\u0431\u0440\u0438\u0442\u0430\u043d\u0438\u044f": "UK", "\u0438\u0437\u0440\u0430\u0438\u043b\u044c": "Israel", "\u0438\u0441\u043f\u0430\u043d\u0438\u044f": "Spain",
+  "\u044f\u043f\u043e\u043d\u0438\u044f": "Japan", "\u0443\u043a\u0440\u0430\u0438\u043d\u0430": "Ukraine", "\u0435\u0433\u0438\u043f\u0435\u0442": "Egypt",
+  "\u043a\u0430\u043d\u0430\u0434\u0430": "Canada", "\u043d\u0438\u0433\u0435\u0440\u0438\u044f": "Nigeria", "\u0430\u0432\u0441\u0442\u0440\u0430\u043b\u0438\u044f": "Australia",
+  "\u0442\u0430\u0438\u043b\u0430\u043d\u0434": "Thailand", "\u043c\u0435\u043a\u0441\u0438\u043a\u0430": "Mexico", "\u0441\u0430\u0443\u0434\u043e\u0432\u0441\u043a\u0430\u044f \u0430\u0440\u0430\u0432\u0438\u044f": "Saudi Arabia",
+  "\u043e\u0430\u044d": "UAE", "\u0442\u0430\u0439\u0432\u0430\u043d\u044c": "Taiwan", "\u044e\u0436\u043d\u0430\u044f \u043a\u043e\u0440\u0435\u044f": "South Korea",
+  "\u0430\u0440\u0433\u0435\u043d\u0442\u0438\u043d\u0430": "Argentina", "\u043c\u0430\u043b\u0430\u0439\u0437\u0438\u044f": "Malaysia", "\u0431\u0430\u043d\u0433\u043b\u0430\u0434\u0435\u0448": "Bangladesh",
+  "\u0431\u0435\u043b\u044c\u0433\u0438\u044f": "Belgium", "\u0448\u0432\u0435\u0439\u0446\u0430\u0440\u0438\u044f": "Switzerland", "\u0433\u0440\u0435\u0446\u0438\u044f": "Greece",
+  "\u0432\u044c\u0435\u0442\u043d\u0430\u043c": "Vietnam", "\u0431\u0435\u043b\u0430\u0440\u0443\u0441\u044c": "Belarus", "\u0430\u0432\u0441\u0442\u0440\u0438\u044f": "Austria",
+  "\u043b\u0438\u0442\u0432\u0430": "Lithuania", "\u0432\u0435\u043d\u0433\u0440\u0438\u044f": "Hungary", "\u0444\u0438\u043d\u043b\u044f\u043d\u0434\u0438\u044f": "Finland",
+  "\u0447\u0438\u043b\u0438": "Chile", "\u0434\u0430\u043d\u0438\u044f": "Denmark", "\u044d\u0441\u0442\u043e\u043d\u0438\u044f": "Estonia",
+  "\u0447\u0435\u0445\u0438\u044f": "Czechia", "\u0445\u043e\u0440\u0432\u0430\u0442\u0438\u044f": "Croatia", "\u043c\u0430\u043b\u044c\u0442\u0430": "Malta",
+  "\u043b\u0430\u0442\u0432\u0438\u044f": "Latvia", "\u0435\u0432\u0440\u043e\u043f\u0430": "Europe", "\u0438\u0440\u0430\u043d": "Iran",
+  "\u0448\u0432\u0435\u0446\u0438\u044f": "Sweden", "\u043f\u043e\u0440\u0442\u0443\u0433\u0430\u043b\u0438\u044f": "Portugal", "\u043c\u0430\u0440\u043e\u043a\u043a\u043e": "Morocco",
+  "\u043f\u0430\u043a\u0438\u0441\u0442\u0430\u043d": "Pakistan", "\u043a\u043e\u043b\u0443\u043c\u0431\u0438\u044f": "Colombia", "\u0433\u0440\u0443\u0437\u0438\u044f": "Georgia",
+  "\u0430\u043b\u0431\u0430\u043d\u0438\u044f": "Albania", "\u0444\u0438\u043b\u0438\u043f\u043f\u0438\u043d\u044b": "Philippines", "\u0430\u0440\u043c\u0435\u043d\u0438\u044f": "Armenia",
+  "\u0442\u0443\u043d\u0438\u0441": "Tunisia", "\u043a\u0430\u0442\u0430\u0440": "Qatar", "\u043f\u043e\u043b\u044c\u0448\u0430": "Poland",
+  "\u0430\u043b\u0436\u0438\u0440": "Algeria", "\u043d\u0438\u0434\u0435\u0440\u043b\u0430\u043d\u0434\u044b": "Netherlands", "\u0438\u0440\u0430\u043a": "Iraq",
+  "\u0438\u0440\u043b\u0430\u043d\u0434\u0438\u044f": "Ireland", "\u0434\u043e\u043c\u0438\u043d\u0438\u043a\u0430\u043d\u0430": "Dominican Republic",
+  "\u0441\u0435\u0440\u0431\u0438\u044f": "Serbia", "\u0431\u043e\u043b\u0433\u0430\u0440\u0438\u044f": "Bulgaria", "\u0440\u0443\u043c\u044b\u043d\u0438\u044f": "Romania",
+  "\u043c\u0438\u0440": "Worldwide", "\u0441\u043d\u0433": "CIS",
+  "\u0430\u0440\u0430\u0431\u0441\u043a\u0438\u0435 \u0441\u0442\u0440\u0430\u043d\u044b": "Arab countries",
+  "\u0430\u0437\u0435\u0440\u0431\u0430\u0439\u0434\u0436\u0430\u043d": "Azerbaijan", "\u043a\u0438\u0440\u0433\u0438\u0437\u0438\u044f": "Kyrgyzstan",
+  "\u0442\u0430\u0434\u0436\u0438\u043a\u0438\u0441\u0442\u0430\u043d": "Tajikistan", "\u0442\u0443\u0440\u043a\u043c\u0435\u043d\u0438\u0441\u0442\u0430\u043d": "Turkmenistan",
+  "\u043c\u043e\u043d\u0433\u043e\u043b\u0438\u044f": "Mongolia", "\u043d\u0435\u043f\u0430\u043b": "Nepal", "\u0448\u0440\u0438 \u043b\u0430\u043d\u043a\u0430": "Sri Lanka",
+  "\u044e\u0436\u043d\u0430\u044f \u0430\u0444\u0440\u0438\u043a\u0430": "South Africa", "\u043d\u043e\u0432\u0430\u044f \u0437\u0435\u043b\u0430\u043d\u0434\u0438\u044f": "New Zealand",
+  "\u0441\u0435\u0432\u0435\u0440\u043d\u0430\u044f \u043c\u0430\u043a\u0435\u0434\u043e\u043d\u0438\u044f": "North Macedonia", "\u043a\u043e\u0441\u0442\u0430 \u0440\u0438\u043a\u0430": "Costa Rica",
+  "\u043f\u0443\u044d\u0440\u0442\u043e \u0440\u0438\u043a\u043e": "Puerto Rico", "\u0441\u0430\u043b\u044c\u0432\u0430\u0434\u043e\u0440": "El Salvador",
 };
 
 /* ---------- full-segment phrases ---------- */
@@ -122,205 +124,205 @@ const COUNTRIES = {
 const PHRASES = new Map(Object.entries({
   "❎": "No refill",
   "✅": "Guaranteed",
-  "🌍 любая страна": "Any country",
-  "🌍 мир": "Worldwide",
-  "🌏 мир": "Worldwide",
-  "🇷🇺 россия и снг": "Russia & CIS",
-  "для региона 🇷🇺 россия и снг": "Russia & CIS region",
-  "для региона 🇷🇺 россия": "Russia region",
-  "для региона 🌐 снг без россии": "CIS excl. Russia",
-  "🇷🇺 россия + снг": "Russia + CIS",
-  "🇺🇸 сша и 🇨🇦 канада": "USA & Canada",
-  "подписчики": "FOLLOWERS_OR_MEMBERS",
-  "просмотры": "Views",
-  "просмотры видео": "Video views",
-  "просмотры постов": "Post views",
-  "просмотры на пост": "Post views",
-  "просмотры историй": "Story views",
-  "просмотры лесенкой": "Gradual views",
-  "автопросмотры": "Auto views",
-  "лайки": "Likes",
-  "лайки на пост": "Post likes",
-  "лайки на 1 пост": "Likes on 1 post",
-  "лайки на видео": "Video likes",
-  "автолайки": "Auto likes",
-  "реакции": "Reactions",
-  "реакции на пост": "Post reactions",
-  "реакции на комментарий": "Comment reactions",
-  "реакции на истории": "Story reactions",
-  "автореакции": "Auto reactions",
-  "авторепосты": "Auto reposts",
-  "комментарии": "Comments",
-  "живые нативные комментарии": "Live native comments",
-  "репосты": "Reposts",
-  "зрители": "Viewers",
-  "зрители на стрим": "Live stream viewers",
-  "зрители + чат боты": "Viewers + chat bots",
-  "чат боты с сообщениями в чат": "Chat bots with messages",
-  "с авторизацей в чате": "Chat-authorized",
-  "с авторизацией в чате": "Chat-authorized",
-  "без авторизации в чате": "No chat auth",
-  "авторизованные": "Authorized",
-  "неавторизованные": "Non-authorized",
-  "с просмотрами": "With views",
-  "без просмотров": "No views",
-  "прослушивания": "Plays",
-  "прослушивания трека": "Track plays",
-  "прослушивания плейлиста / альбома": "Playlist / album plays",
-  "прослушивания подкаста": "Podcast plays",
-  "слушатели в месяц": "Monthly listeners",
-  "слушатели в spaces": "Spaces listeners",
-  "сохранения": "Saves",
-  "сохранения трека / альбома": "Track / album saves",
-  "жалобы": "Reports",
-  "жалобы на аккаунт": "Account reports",
-  "старты бота": "Bot starts",
-  "старты бота с активностью": "Bot starts with activity",
-  "ежедневные рестарты бота": "Daily bot restarts",
-  "буст канала": "Channel boost",
-  "бусты каналов": "Channel boosts",
-  "на видео": "On video",
-  "premium пользователи": "Premium users",
-  "⭐️ premium аккаунты": "Premium accounts",
-  "премиум аккаунты": "Premium accounts",
-  "⭐️premium подписчиков": "Premium followers",
-  "собственные": "Own",
-  "с рекламы": "From ads",
-  "для открытых каналов": "Public channels",
-  "для приватных каналов": "Private channels",
-  "для закрытых каналов": "Private channels",
-  "открытые + приватные каналы": "Public + private channels",
-  "женский пол": "Female",
-  "мужской пол": "Male",
-  "женщины": "Female",
-  "мужчины": "Male",
-  "быстрые": "Fast",
-  "плавные": "Gradual",
-  "рандомные": "Random",
-  "🟢 онлайн": "Online",
-  "👑 живые": "Real",
-  "👑 идут в статистику": "Counted in stats",
-  "собственный текст сообщений": "Custom message text",
-  "только мобильный трафик": "Mobile traffic only",
-  "друзья": "Friends",
-  "голосования": "Poll votes",
-  "добавить товар в корзину": "Add to cart",
-  "добавление в корзину": "Add to cart",
-  "насилие": "Violence report",
-  "незаконные товары и услуги": "Illegal goods report",
-  "удержание": "Retention",
-  "реальные пользователи": "Real users",
-  "база 1": "Base 1",
-  "база 2": "Base 2",
-  "база 3": "Base 3",
+  "🌍 \u043b\u044e\u0431\u0430\u044f \u0441\u0442\u0440\u0430\u043d\u0430": "Any country",
+  "🌍 \u043c\u0438\u0440": "Worldwide",
+  "🌏 \u043c\u0438\u0440": "Worldwide",
+  "🇷🇺 \u0440\u043e\u0441\u0441\u0438\u044f \u0438 \u0441\u043d\u0433": "Russia & CIS",
+  "\u0434\u043b\u044f \u0440\u0435\u0433\u0438\u043e\u043d\u0430 🇷🇺 \u0440\u043e\u0441\u0441\u0438\u044f \u0438 \u0441\u043d\u0433": "Russia & CIS region",
+  "\u0434\u043b\u044f \u0440\u0435\u0433\u0438\u043e\u043d\u0430 🇷🇺 \u0440\u043e\u0441\u0441\u0438\u044f": "Russia region",
+  "\u0434\u043b\u044f \u0440\u0435\u0433\u0438\u043e\u043d\u0430 🌐 \u0441\u043d\u0433 \u0431\u0435\u0437 \u0440\u043e\u0441\u0441\u0438\u0438": "CIS excl. Russia",
+  "🇷🇺 \u0440\u043e\u0441\u0441\u0438\u044f + \u0441\u043d\u0433": "Russia + CIS",
+  "🇺🇸 \u0441\u0448\u0430 \u0438 🇨🇦 \u043a\u0430\u043d\u0430\u0434\u0430": "USA & Canada",
+  "\u043f\u043e\u0434\u043f\u0438\u0441\u0447\u0438\u043a\u0438": "FOLLOWERS_OR_MEMBERS",
+  "\u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440\u044b": "Views",
+  "\u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440\u044b \u0432\u0438\u0434\u0435\u043e": "Video views",
+  "\u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440\u044b \u043f\u043e\u0441\u0442\u043e\u0432": "Post views",
+  "\u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440\u044b \u043d\u0430 \u043f\u043e\u0441\u0442": "Post views",
+  "\u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440\u044b \u0438\u0441\u0442\u043e\u0440\u0438\u0439": "Story views",
+  "\u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440\u044b \u043b\u0435\u0441\u0435\u043d\u043a\u043e\u0439": "Gradual views",
+  "\u0430\u0432\u0442\u043e\u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440\u044b": "Auto views",
+  "\u043b\u0430\u0439\u043a\u0438": "Likes",
+  "\u043b\u0430\u0439\u043a\u0438 \u043d\u0430 \u043f\u043e\u0441\u0442": "Post likes",
+  "\u043b\u0430\u0439\u043a\u0438 \u043d\u0430 1 \u043f\u043e\u0441\u0442": "Likes on 1 post",
+  "\u043b\u0430\u0439\u043a\u0438 \u043d\u0430 \u0432\u0438\u0434\u0435\u043e": "Video likes",
+  "\u0430\u0432\u0442\u043e\u043b\u0430\u0439\u043a\u0438": "Auto likes",
+  "\u0440\u0435\u0430\u043a\u0446\u0438\u0438": "Reactions",
+  "\u0440\u0435\u0430\u043a\u0446\u0438\u0438 \u043d\u0430 \u043f\u043e\u0441\u0442": "Post reactions",
+  "\u0440\u0435\u0430\u043a\u0446\u0438\u0438 \u043d\u0430 \u043a\u043e\u043c\u043c\u0435\u043d\u0442\u0430\u0440\u0438\u0439": "Comment reactions",
+  "\u0440\u0435\u0430\u043a\u0446\u0438\u0438 \u043d\u0430 \u0438\u0441\u0442\u043e\u0440\u0438\u0438": "Story reactions",
+  "\u0430\u0432\u0442\u043e\u0440\u0435\u0430\u043a\u0446\u0438\u0438": "Auto reactions",
+  "\u0430\u0432\u0442\u043e\u0440\u0435\u043f\u043e\u0441\u0442\u044b": "Auto reposts",
+  "\u043a\u043e\u043c\u043c\u0435\u043d\u0442\u0430\u0440\u0438\u0438": "Comments",
+  "\u0436\u0438\u0432\u044b\u0435 \u043d\u0430\u0442\u0438\u0432\u043d\u044b\u0435 \u043a\u043e\u043c\u043c\u0435\u043d\u0442\u0430\u0440\u0438\u0438": "Live native comments",
+  "\u0440\u0435\u043f\u043e\u0441\u0442\u044b": "Reposts",
+  "\u0437\u0440\u0438\u0442\u0435\u043b\u0438": "Viewers",
+  "\u0437\u0440\u0438\u0442\u0435\u043b\u0438 \u043d\u0430 \u0441\u0442\u0440\u0438\u043c": "Live stream viewers",
+  "\u0437\u0440\u0438\u0442\u0435\u043b\u0438 + \u0447\u0430\u0442 \u0431\u043e\u0442\u044b": "Viewers + chat bots",
+  "\u0447\u0430\u0442 \u0431\u043e\u0442\u044b \u0441 \u0441\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u044f\u043c\u0438 \u0432 \u0447\u0430\u0442": "Chat bots with messages",
+  "\u0441 \u0430\u0432\u0442\u043e\u0440\u0438\u0437\u0430\u0446\u0435\u0439 \u0432 \u0447\u0430\u0442\u0435": "Chat-authorized",
+  "\u0441 \u0430\u0432\u0442\u043e\u0440\u0438\u0437\u0430\u0446\u0438\u0435\u0439 \u0432 \u0447\u0430\u0442\u0435": "Chat-authorized",
+  "\u0431\u0435\u0437 \u0430\u0432\u0442\u043e\u0440\u0438\u0437\u0430\u0446\u0438\u0438 \u0432 \u0447\u0430\u0442\u0435": "No chat auth",
+  "\u0430\u0432\u0442\u043e\u0440\u0438\u0437\u043e\u0432\u0430\u043d\u043d\u044b\u0435": "Authorized",
+  "\u043d\u0435\u0430\u0432\u0442\u043e\u0440\u0438\u0437\u043e\u0432\u0430\u043d\u043d\u044b\u0435": "Non-authorized",
+  "\u0441 \u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440\u0430\u043c\u0438": "With views",
+  "\u0431\u0435\u0437 \u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440\u043e\u0432": "No views",
+  "\u043f\u0440\u043e\u0441\u043b\u0443\u0448\u0438\u0432\u0430\u043d\u0438\u044f": "Plays",
+  "\u043f\u0440\u043e\u0441\u043b\u0443\u0448\u0438\u0432\u0430\u043d\u0438\u044f \u0442\u0440\u0435\u043a\u0430": "Track plays",
+  "\u043f\u0440\u043e\u0441\u043b\u0443\u0448\u0438\u0432\u0430\u043d\u0438\u044f \u043f\u043b\u0435\u0439\u043b\u0438\u0441\u0442\u0430 / \u0430\u043b\u044c\u0431\u043e\u043c\u0430": "Playlist / album plays",
+  "\u043f\u0440\u043e\u0441\u043b\u0443\u0448\u0438\u0432\u0430\u043d\u0438\u044f \u043f\u043e\u0434\u043a\u0430\u0441\u0442\u0430": "Podcast plays",
+  "\u0441\u043b\u0443\u0448\u0430\u0442\u0435\u043b\u0438 \u0432 \u043c\u0435\u0441\u044f\u0446": "Monthly listeners",
+  "\u0441\u043b\u0443\u0448\u0430\u0442\u0435\u043b\u0438 \u0432 spaces": "Spaces listeners",
+  "\u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u0438\u044f": "Saves",
+  "\u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u0438\u044f \u0442\u0440\u0435\u043a\u0430 / \u0430\u043b\u044c\u0431\u043e\u043c\u0430": "Track / album saves",
+  "\u0436\u0430\u043b\u043e\u0431\u044b": "Reports",
+  "\u0436\u0430\u043b\u043e\u0431\u044b \u043d\u0430 \u0430\u043a\u043a\u0430\u0443\u043d\u0442": "Account reports",
+  "\u0441\u0442\u0430\u0440\u0442\u044b \u0431\u043e\u0442\u0430": "Bot starts",
+  "\u0441\u0442\u0430\u0440\u0442\u044b \u0431\u043e\u0442\u0430 \u0441 \u0430\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u044c\u044e": "Bot starts with activity",
+  "\u0435\u0436\u0435\u0434\u043d\u0435\u0432\u043d\u044b\u0435 \u0440\u0435\u0441\u0442\u0430\u0440\u0442\u044b \u0431\u043e\u0442\u0430": "Daily bot restarts",
+  "\u0431\u0443\u0441\u0442 \u043a\u0430\u043d\u0430\u043b\u0430": "Channel boost",
+  "\u0431\u0443\u0441\u0442\u044b \u043a\u0430\u043d\u0430\u043b\u043e\u0432": "Channel boosts",
+  "\u043d\u0430 \u0432\u0438\u0434\u0435\u043e": "On video",
+  "premium \u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u0438": "Premium users",
+  "⭐️ premium \u0430\u043a\u043a\u0430\u0443\u043d\u0442\u044b": "Premium accounts",
+  "\u043f\u0440\u0435\u043c\u0438\u0443\u043c \u0430\u043a\u043a\u0430\u0443\u043d\u0442\u044b": "Premium accounts",
+  "⭐️premium \u043f\u043e\u0434\u043f\u0438\u0441\u0447\u0438\u043a\u043e\u0432": "Premium followers",
+  "\u0441\u043e\u0431\u0441\u0442\u0432\u0435\u043d\u043d\u044b\u0435": "Own",
+  "\u0441 \u0440\u0435\u043a\u043b\u0430\u043c\u044b": "From ads",
+  "\u0434\u043b\u044f \u043e\u0442\u043a\u0440\u044b\u0442\u044b\u0445 \u043a\u0430\u043d\u0430\u043b\u043e\u0432": "Public channels",
+  "\u0434\u043b\u044f \u043f\u0440\u0438\u0432\u0430\u0442\u043d\u044b\u0445 \u043a\u0430\u043d\u0430\u043b\u043e\u0432": "Private channels",
+  "\u0434\u043b\u044f \u0437\u0430\u043a\u0440\u044b\u0442\u044b\u0445 \u043a\u0430\u043d\u0430\u043b\u043e\u0432": "Private channels",
+  "\u043e\u0442\u043a\u0440\u044b\u0442\u044b\u0435 + \u043f\u0440\u0438\u0432\u0430\u0442\u043d\u044b\u0435 \u043a\u0430\u043d\u0430\u043b\u044b": "Public + private channels",
+  "\u0436\u0435\u043d\u0441\u043a\u0438\u0439 \u043f\u043e\u043b": "Female",
+  "\u043c\u0443\u0436\u0441\u043a\u043e\u0439 \u043f\u043e\u043b": "Male",
+  "\u0436\u0435\u043d\u0449\u0438\u043d\u044b": "Female",
+  "\u043c\u0443\u0436\u0447\u0438\u043d\u044b": "Male",
+  "\u0431\u044b\u0441\u0442\u0440\u044b\u0435": "Fast",
+  "\u043f\u043b\u0430\u0432\u043d\u044b\u0435": "Gradual",
+  "\u0440\u0430\u043d\u0434\u043e\u043c\u043d\u044b\u0435": "Random",
+  "🟢 \u043e\u043d\u043b\u0430\u0439\u043d": "Online",
+  "👑 \u0436\u0438\u0432\u044b\u0435": "Real",
+  "👑 \u0438\u0434\u0443\u0442 \u0432 \u0441\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043a\u0443": "Counted in stats",
+  "\u0441\u043e\u0431\u0441\u0442\u0432\u0435\u043d\u043d\u044b\u0439 \u0442\u0435\u043a\u0441\u0442 \u0441\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u0439": "Custom message text",
+  "\u0442\u043e\u043b\u044c\u043a\u043e \u043c\u043e\u0431\u0438\u043b\u044c\u043d\u044b\u0439 \u0442\u0440\u0430\u0444\u0438\u043a": "Mobile traffic only",
+  "\u0434\u0440\u0443\u0437\u044c\u044f": "Friends",
+  "\u0433\u043e\u043b\u043e\u0441\u043e\u0432\u0430\u043d\u0438\u044f": "Poll votes",
+  "\u0434\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u0442\u043e\u0432\u0430\u0440 \u0432 \u043a\u043e\u0440\u0437\u0438\u043d\u0443": "Add to cart",
+  "\u0434\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u0438\u0435 \u0432 \u043a\u043e\u0440\u0437\u0438\u043d\u0443": "Add to cart",
+  "\u043d\u0430\u0441\u0438\u043b\u0438\u0435": "Violence report",
+  "\u043d\u0435\u0437\u0430\u043a\u043e\u043d\u043d\u044b\u0435 \u0442\u043e\u0432\u0430\u0440\u044b \u0438 \u0443\u0441\u043b\u0443\u0433\u0438": "Illegal goods report",
+  "\u0443\u0434\u0435\u0440\u0436\u0430\u043d\u0438\u0435": "Retention",
+  "\u0440\u0435\u0430\u043b\u044c\u043d\u044b\u0435 \u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u0438": "Real users",
+  "\u0431\u0430\u0437\u0430 1": "Base 1",
+  "\u0431\u0430\u0437\u0430 2": "Base 2",
+  "\u0431\u0430\u0437\u0430 3": "Base 3",
   "ᴀᴜᴛᴏ": "AUTO",
   "dlc": "DLC",
   "upvotes": "Upvotes",
-  "5 звёзд + отзывы (собственные)": "5 stars + reviews (own)",
-  "не многословные": "Brief",
-  "комплексное продвижение": "Full promotion",
-  "индекс цитирования": "Citation index",
-  "наркотики и психоактивные вещества": "Drugs & substances report",
-  "наркотики": "Drugs report",
-  "֎ ии умные чат боты с общением в чате": "AI smart chat bots",
+  "5 \u0437\u0432\u0451\u0437\u0434 + \u043e\u0442\u0437\u044b\u0432\u044b (\u0441\u043e\u0431\u0441\u0442\u0432\u0435\u043d\u043d\u044b\u0435)": "5 stars + reviews (own)",
+  "\u043d\u0435 \u043c\u043d\u043e\u0433\u043e\u0441\u043b\u043e\u0432\u043d\u044b\u0435": "Brief",
+  "\u043a\u043e\u043c\u043f\u043b\u0435\u043a\u0441\u043d\u043e\u0435 \u043f\u0440\u043e\u0434\u0432\u0438\u0436\u0435\u043d\u0438\u0435": "Full promotion",
+  "\u0438\u043d\u0434\u0435\u043a\u0441 \u0446\u0438\u0442\u0438\u0440\u043e\u0432\u0430\u043d\u0438\u044f": "Citation index",
+  "\u043d\u0430\u0440\u043a\u043e\u0442\u0438\u043a\u0438 \u0438 \u043f\u0441\u0438\u0445\u043e\u0430\u043a\u0442\u0438\u0432\u043d\u044b\u0435 \u0432\u0435\u0449\u0435\u0441\u0442\u0432\u0430": "Drugs & substances report",
+  "\u043d\u0430\u0440\u043a\u043e\u0442\u0438\u043a\u0438": "Drugs report",
+  "֎ \u0438\u0438 \u0443\u043c\u043d\u044b\u0435 \u0447\u0430\u0442 \u0431\u043e\u0442\u044b \u0441 \u043e\u0431\u0449\u0435\u043d\u0438\u0435\u043c \u0432 \u0447\u0430\u0442\u0435": "AI smart chat bots",
   "💯": "100%",
-  "просмотр всех сторис": "All stories views",
-  "просмотр сторис": "Story views",
-  "игры steam": "Steam games",
-  "игры xbox": "Xbox games",
-  "игры ubisoft": "Ubisoft games",
-  "игры ea": "EA games",
+  "\u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440 \u0432\u0441\u0435\u0445 \u0441\u0442\u043e\u0440\u0438\u0441": "All stories views",
+  "\u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440 \u0441\u0442\u043e\u0440\u0438\u0441": "Story views",
+  "\u0438\u0433\u0440\u044b steam": "Steam games",
+  "\u0438\u0433\u0440\u044b xbox": "Xbox games",
+  "\u0438\u0433\u0440\u044b ubisoft": "Ubisoft games",
+  "\u0438\u0433\u0440\u044b ea": "EA games",
 }));
 
 /* word-level fallback */
 const WORDS = {
-  "подписчики": "FOLLOWERS_OR_MEMBERS",
-  "подписчиков": "FOLLOWERS_OR_MEMBERS",
-  "просмотры": "views", "просмотров": "views",
-  "автопросмотры": "auto views", "автопросмотров": "auto views",
-  "лайки": "likes", "лайков": "likes",
-  "реакции": "reactions", "автореакции": "auto reactions",
-  "комментарии": "comments", "комментариев": "comments",
-  "репосты": "reposts", "авторепосты": "auto reposts",
-  "зрители": "viewers", "зрителей": "viewers",
-  "прослушивания": "plays", "прослушиваний": "plays",
-  "слушатели": "listeners", "слушателей": "listeners",
-  "сохранения": "saves", "жалобы": "reports",
-  "подписки": "subscriptions", "отписки": "unsubscribes",
-  "видео": "video", "пост": "post", "поста": "post", "постов": "posts",
-  "посты": "posts", "истории": "stories", "историй": "stories",
-  "сторис": "stories", "трека": "track", "трек": "track",
-  "плейлиста": "playlist", "плейлист": "playlist", "альбома": "album",
-  "альбом": "album", "подкаста": "podcast", "подкаст": "podcast",
-  "каналов": "channels", "канала": "channel", "канал": "channel",
-  "бота": "bot", "бот": "bot", "старты": "starts", "старт": "start",
-  "рестарты": "restarts", "аккаунты": "accounts", "аккаунта": "account",
-  "аккаунт": "account", "пользователи": "users", "пользователей": "users",
-  "чат": "chat", "чате": "chat", "стрим": "stream", "стрима": "stream",
-  "рекламы": "ads", "реклама": "ads",
-  "новых": "new", "новые": "new", "новый": "new",
-  "будущих": "future", "последние": "latest",
-  "вечная": "lifetime", "гарантия": "guarantee", "гарантии": "guarantee",
-  "месяц": "month", "месяца": "months", "неделя": "week", "недели": "weeks",
-  "день": "day", "дня": "days", "дней": "days",
-  "час": "hour", "часа": "hours", "часов": "hours",
-  "минут": "minutes", "минуты": "minutes",
-  "мужской": "male", "женский": "female", "пол": "gender",
-  "мир": "worldwide", "страна": "country", "любая": "any",
-  "региона": "region", "снг": "cis", "россия": "russia",
-  "без": "without", "для": "for", "на": "on", "и": "&", "в": "in",
-  "с": "with", "от": "from", "по": "per", "или": "or",
-  "быстрые": "fast", "быстрый": "fast", "плавные": "gradual",
-  "рандомные": "random", "собственные": "own", "собственный": "own",
-  "живые": "real", "нативные": "native",
-  "игры": "games", "дополнения": "add-ons",
-  "бусты": "boosts", "буст": "boost",
-  "отзывы": "reviews", "отзыв": "review",
-  "друзья": "friends", "группы": "groups", "группа": "group",
-  "сообщества": "communities", "сообщество": "community",
-  "дошли": "delivered", "онлайн": "online",
-  "голосования": "poll votes", "голоса": "votes",
-  "вопросы": "questions", "ответы": "answers",
-  "добавить": "add", "товар": "product", "корзину": "cart",
-  "избранное": "favorites", "желаний": "wishlist",
-  "показы": "impressions", "охват": "reach",
-  "просмотр": "views", "всех": "all", "все": "all", "всех сторис": "stories",
-  "переходы": "clicks", "клики": "clicks",
-  "установки": "installs", "установок": "installs",
-  "приложения": "apps", "приложений": "apps", "приложение": "app",
-  "участники": "participants", "мероприятия": "events", "мероприятие": "event",
-  "комментарий": "comment", "сообществе": "community",
-  "рекламного": "ad", "рекламное": "ad", "сообщения": "message",
-  "поиске": "search", "поиск": "search",
-  "артиста": "artist", "артист": "artist", "пользователя": "user",
-  "наркотики": "drugs", "психоактивные": "psychoactive",
-  "вещества": "substances", "веществ": "substances",
-  "индекс": "index", "цитирования": "citation",
-  "запрещённых": "restricted", "запрещенных": "restricted",
-  "сайтах": "sites", "сайт": "site", "сайта": "site",
-  "регистрации": "registration", "регистрация": "registration",
-  "монетизацией": "monetization", "монетизация": "monetization",
-  "года": "year", "год": "year",
-  "закрытых": "private", "закрытые": "private", "каналах": "channels",
-  "жестокость": "cruelty", "крайняя": "extreme", "расчленение": "dismemberment",
-  "другие": "other", "другой": "other",
-  "удержание": "retention", "реальные": "real", "реальный": "real",
-  "сек": "sec", "секунд": "sec", "секунды": "sec",
-  "автопросмотрами": "auto views",
-  "порнографические": "pornographic", "материалы": "materials",
-  "интимные": "intimate", "изображения": "images", "согласия": "consent",
-  "персональные": "personal", "личные": "personal", "данные": "data",
-  "поднятие": "boost", "топ": "top",
+  "\u043f\u043e\u0434\u043f\u0438\u0441\u0447\u0438\u043a\u0438": "FOLLOWERS_OR_MEMBERS",
+  "\u043f\u043e\u0434\u043f\u0438\u0441\u0447\u0438\u043a\u043e\u0432": "FOLLOWERS_OR_MEMBERS",
+  "\u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440\u044b": "views", "\u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440\u043e\u0432": "views",
+  "\u0430\u0432\u0442\u043e\u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440\u044b": "auto views", "\u0430\u0432\u0442\u043e\u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440\u043e\u0432": "auto views",
+  "\u043b\u0430\u0439\u043a\u0438": "likes", "\u043b\u0430\u0439\u043a\u043e\u0432": "likes",
+  "\u0440\u0435\u0430\u043a\u0446\u0438\u0438": "reactions", "\u0430\u0432\u0442\u043e\u0440\u0435\u0430\u043a\u0446\u0438\u0438": "auto reactions",
+  "\u043a\u043e\u043c\u043c\u0435\u043d\u0442\u0430\u0440\u0438\u0438": "comments", "\u043a\u043e\u043c\u043c\u0435\u043d\u0442\u0430\u0440\u0438\u0435\u0432": "comments",
+  "\u0440\u0435\u043f\u043e\u0441\u0442\u044b": "reposts", "\u0430\u0432\u0442\u043e\u0440\u0435\u043f\u043e\u0441\u0442\u044b": "auto reposts",
+  "\u0437\u0440\u0438\u0442\u0435\u043b\u0438": "viewers", "\u0437\u0440\u0438\u0442\u0435\u043b\u0435\u0439": "viewers",
+  "\u043f\u0440\u043e\u0441\u043b\u0443\u0448\u0438\u0432\u0430\u043d\u0438\u044f": "plays", "\u043f\u0440\u043e\u0441\u043b\u0443\u0448\u0438\u0432\u0430\u043d\u0438\u0439": "plays",
+  "\u0441\u043b\u0443\u0448\u0430\u0442\u0435\u043b\u0438": "listeners", "\u0441\u043b\u0443\u0448\u0430\u0442\u0435\u043b\u0435\u0439": "listeners",
+  "\u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u0438\u044f": "saves", "\u0436\u0430\u043b\u043e\u0431\u044b": "reports",
+  "\u043f\u043e\u0434\u043f\u0438\u0441\u043a\u0438": "subscriptions", "\u043e\u0442\u043f\u0438\u0441\u043a\u0438": "unsubscribes",
+  "\u0432\u0438\u0434\u0435\u043e": "video", "\u043f\u043e\u0441\u0442": "post", "\u043f\u043e\u0441\u0442\u0430": "post", "\u043f\u043e\u0441\u0442\u043e\u0432": "posts",
+  "\u043f\u043e\u0441\u0442\u044b": "posts", "\u0438\u0441\u0442\u043e\u0440\u0438\u0438": "stories", "\u0438\u0441\u0442\u043e\u0440\u0438\u0439": "stories",
+  "\u0441\u0442\u043e\u0440\u0438\u0441": "stories", "\u0442\u0440\u0435\u043a\u0430": "track", "\u0442\u0440\u0435\u043a": "track",
+  "\u043f\u043b\u0435\u0439\u043b\u0438\u0441\u0442\u0430": "playlist", "\u043f\u043b\u0435\u0439\u043b\u0438\u0441\u0442": "playlist", "\u0430\u043b\u044c\u0431\u043e\u043c\u0430": "album",
+  "\u0430\u043b\u044c\u0431\u043e\u043c": "album", "\u043f\u043e\u0434\u043a\u0430\u0441\u0442\u0430": "podcast", "\u043f\u043e\u0434\u043a\u0430\u0441\u0442": "podcast",
+  "\u043a\u0430\u043d\u0430\u043b\u043e\u0432": "channels", "\u043a\u0430\u043d\u0430\u043b\u0430": "channel", "\u043a\u0430\u043d\u0430\u043b": "channel",
+  "\u0431\u043e\u0442\u0430": "bot", "\u0431\u043e\u0442": "bot", "\u0441\u0442\u0430\u0440\u0442\u044b": "starts", "\u0441\u0442\u0430\u0440\u0442": "start",
+  "\u0440\u0435\u0441\u0442\u0430\u0440\u0442\u044b": "restarts", "\u0430\u043a\u043a\u0430\u0443\u043d\u0442\u044b": "accounts", "\u0430\u043a\u043a\u0430\u0443\u043d\u0442\u0430": "account",
+  "\u0430\u043a\u043a\u0430\u0443\u043d\u0442": "account", "\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u0438": "users", "\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u0435\u0439": "users",
+  "\u0447\u0430\u0442": "chat", "\u0447\u0430\u0442\u0435": "chat", "\u0441\u0442\u0440\u0438\u043c": "stream", "\u0441\u0442\u0440\u0438\u043c\u0430": "stream",
+  "\u0440\u0435\u043a\u043b\u0430\u043c\u044b": "ads", "\u0440\u0435\u043a\u043b\u0430\u043c\u0430": "ads",
+  "\u043d\u043e\u0432\u044b\u0445": "new", "\u043d\u043e\u0432\u044b\u0435": "new", "\u043d\u043e\u0432\u044b\u0439": "new",
+  "\u0431\u0443\u0434\u0443\u0449\u0438\u0445": "future", "\u043f\u043e\u0441\u043b\u0435\u0434\u043d\u0438\u0435": "latest",
+  "\u0432\u0435\u0447\u043d\u0430\u044f": "lifetime", "\u0433\u0430\u0440\u0430\u043d\u0442\u0438\u044f": "guarantee", "\u0433\u0430\u0440\u0430\u043d\u0442\u0438\u0438": "guarantee",
+  "\u043c\u0435\u0441\u044f\u0446": "month", "\u043c\u0435\u0441\u044f\u0446\u0430": "months", "\u043d\u0435\u0434\u0435\u043b\u044f": "week", "\u043d\u0435\u0434\u0435\u043b\u0438": "weeks",
+  "\u0434\u0435\u043d\u044c": "day", "\u0434\u043d\u044f": "days", "\u0434\u043d\u0435\u0439": "days",
+  "\u0447\u0430\u0441": "hour", "\u0447\u0430\u0441\u0430": "hours", "\u0447\u0430\u0441\u043e\u0432": "hours",
+  "\u043c\u0438\u043d\u0443\u0442": "minutes", "\u043c\u0438\u043d\u0443\u0442\u044b": "minutes",
+  "\u043c\u0443\u0436\u0441\u043a\u043e\u0439": "male", "\u0436\u0435\u043d\u0441\u043a\u0438\u0439": "female", "\u043f\u043e\u043b": "gender",
+  "\u043c\u0438\u0440": "worldwide", "\u0441\u0442\u0440\u0430\u043d\u0430": "country", "\u043b\u044e\u0431\u0430\u044f": "any",
+  "\u0440\u0435\u0433\u0438\u043e\u043d\u0430": "region", "\u0441\u043d\u0433": "cis", "\u0440\u043e\u0441\u0441\u0438\u044f": "russia",
+  "\u0431\u0435\u0437": "without", "\u0434\u043b\u044f": "for", "\u043d\u0430": "on", "\u0438": "&", "\u0432": "in",
+  "\u0441": "with", "\u043e\u0442": "from", "\u043f\u043e": "per", "\u0438\u043b\u0438": "or",
+  "\u0431\u044b\u0441\u0442\u0440\u044b\u0435": "fast", "\u0431\u044b\u0441\u0442\u0440\u044b\u0439": "fast", "\u043f\u043b\u0430\u0432\u043d\u044b\u0435": "gradual",
+  "\u0440\u0430\u043d\u0434\u043e\u043c\u043d\u044b\u0435": "random", "\u0441\u043e\u0431\u0441\u0442\u0432\u0435\u043d\u043d\u044b\u0435": "own", "\u0441\u043e\u0431\u0441\u0442\u0432\u0435\u043d\u043d\u044b\u0439": "own",
+  "\u0436\u0438\u0432\u044b\u0435": "real", "\u043d\u0430\u0442\u0438\u0432\u043d\u044b\u0435": "native",
+  "\u0438\u0433\u0440\u044b": "games", "\u0434\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u044f": "add-ons",
+  "\u0431\u0443\u0441\u0442\u044b": "boosts", "\u0431\u0443\u0441\u0442": "boost",
+  "\u043e\u0442\u0437\u044b\u0432\u044b": "reviews", "\u043e\u0442\u0437\u044b\u0432": "review",
+  "\u0434\u0440\u0443\u0437\u044c\u044f": "friends", "\u0433\u0440\u0443\u043f\u043f\u044b": "groups", "\u0433\u0440\u0443\u043f\u043f\u0430": "group",
+  "\u0441\u043e\u043e\u0431\u0449\u0435\u0441\u0442\u0432\u0430": "communities", "\u0441\u043e\u043e\u0431\u0449\u0435\u0441\u0442\u0432\u043e": "community",
+  "\u0434\u043e\u0448\u043b\u0438": "delivered", "\u043e\u043d\u043b\u0430\u0439\u043d": "online",
+  "\u0433\u043e\u043b\u043e\u0441\u043e\u0432\u0430\u043d\u0438\u044f": "poll votes", "\u0433\u043e\u043b\u043e\u0441\u0430": "votes",
+  "\u0432\u043e\u043f\u0440\u043e\u0441\u044b": "questions", "\u043e\u0442\u0432\u0435\u0442\u044b": "answers",
+  "\u0434\u043e\u0431\u0430\u0432\u0438\u0442\u044c": "add", "\u0442\u043e\u0432\u0430\u0440": "product", "\u043a\u043e\u0440\u0437\u0438\u043d\u0443": "cart",
+  "\u0438\u0437\u0431\u0440\u0430\u043d\u043d\u043e\u0435": "favorites", "\u0436\u0435\u043b\u0430\u043d\u0438\u0439": "wishlist",
+  "\u043f\u043e\u043a\u0430\u0437\u044b": "impressions", "\u043e\u0445\u0432\u0430\u0442": "reach",
+  "\u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440": "views", "\u0432\u0441\u0435\u0445": "all", "\u0432\u0441\u0435": "all", "\u0432\u0441\u0435\u0445 \u0441\u0442\u043e\u0440\u0438\u0441": "stories",
+  "\u043f\u0435\u0440\u0435\u0445\u043e\u0434\u044b": "clicks", "\u043a\u043b\u0438\u043a\u0438": "clicks",
+  "\u0443\u0441\u0442\u0430\u043d\u043e\u0432\u043a\u0438": "installs", "\u0443\u0441\u0442\u0430\u043d\u043e\u0432\u043e\u043a": "installs",
+  "\u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u044f": "apps", "\u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u0439": "apps", "\u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u0435": "app",
+  "\u0443\u0447\u0430\u0441\u0442\u043d\u0438\u043a\u0438": "participants", "\u043c\u0435\u0440\u043e\u043f\u0440\u0438\u044f\u0442\u0438\u044f": "events", "\u043c\u0435\u0440\u043e\u043f\u0440\u0438\u044f\u0442\u0438\u0435": "event",
+  "\u043a\u043e\u043c\u043c\u0435\u043d\u0442\u0430\u0440\u0438\u0439": "comment", "\u0441\u043e\u043e\u0431\u0449\u0435\u0441\u0442\u0432\u0435": "community",
+  "\u0440\u0435\u043a\u043b\u0430\u043c\u043d\u043e\u0433\u043e": "ad", "\u0440\u0435\u043a\u043b\u0430\u043c\u043d\u043e\u0435": "ad", "\u0441\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u044f": "message",
+  "\u043f\u043e\u0438\u0441\u043a\u0435": "search", "\u043f\u043e\u0438\u0441\u043a": "search",
+  "\u0430\u0440\u0442\u0438\u0441\u0442\u0430": "artist", "\u0430\u0440\u0442\u0438\u0441\u0442": "artist", "\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u044f": "user",
+  "\u043d\u0430\u0440\u043a\u043e\u0442\u0438\u043a\u0438": "drugs", "\u043f\u0441\u0438\u0445\u043e\u0430\u043a\u0442\u0438\u0432\u043d\u044b\u0435": "psychoactive",
+  "\u0432\u0435\u0449\u0435\u0441\u0442\u0432\u0430": "substances", "\u0432\u0435\u0449\u0435\u0441\u0442\u0432": "substances",
+  "\u0438\u043d\u0434\u0435\u043a\u0441": "index", "\u0446\u0438\u0442\u0438\u0440\u043e\u0432\u0430\u043d\u0438\u044f": "citation",
+  "\u0437\u0430\u043f\u0440\u0435\u0449\u0451\u043d\u043d\u044b\u0445": "restricted", "\u0437\u0430\u043f\u0440\u0435\u0449\u0435\u043d\u043d\u044b\u0445": "restricted",
+  "\u0441\u0430\u0439\u0442\u0430\u0445": "sites", "\u0441\u0430\u0439\u0442": "site", "\u0441\u0430\u0439\u0442\u0430": "site",
+  "\u0440\u0435\u0433\u0438\u0441\u0442\u0440\u0430\u0446\u0438\u0438": "registration", "\u0440\u0435\u0433\u0438\u0441\u0442\u0440\u0430\u0446\u0438\u044f": "registration",
+  "\u043c\u043e\u043d\u0435\u0442\u0438\u0437\u0430\u0446\u0438\u0435\u0439": "monetization", "\u043c\u043e\u043d\u0435\u0442\u0438\u0437\u0430\u0446\u0438\u044f": "monetization",
+  "\u0433\u043e\u0434\u0430": "year", "\u0433\u043e\u0434": "year",
+  "\u0437\u0430\u043a\u0440\u044b\u0442\u044b\u0445": "private", "\u0437\u0430\u043a\u0440\u044b\u0442\u044b\u0435": "private", "\u043a\u0430\u043d\u0430\u043b\u0430\u0445": "channels",
+  "\u0436\u0435\u0441\u0442\u043e\u043a\u043e\u0441\u0442\u044c": "cruelty", "\u043a\u0440\u0430\u0439\u043d\u044f\u044f": "extreme", "\u0440\u0430\u0441\u0447\u043b\u0435\u043d\u0435\u043d\u0438\u0435": "dismemberment",
+  "\u0434\u0440\u0443\u0433\u0438\u0435": "other", "\u0434\u0440\u0443\u0433\u043e\u0439": "other",
+  "\u0443\u0434\u0435\u0440\u0436\u0430\u043d\u0438\u0435": "retention", "\u0440\u0435\u0430\u043b\u044c\u043d\u044b\u0435": "real", "\u0440\u0435\u0430\u043b\u044c\u043d\u044b\u0439": "real",
+  "\u0441\u0435\u043a": "sec", "\u0441\u0435\u043a\u0443\u043d\u0434": "sec", "\u0441\u0435\u043a\u0443\u043d\u0434\u044b": "sec",
+  "\u0430\u0432\u0442\u043e\u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440\u0430\u043c\u0438": "auto views",
+  "\u043f\u043e\u0440\u043d\u043e\u0433\u0440\u0430\u0444\u0438\u0447\u0435\u0441\u043a\u0438\u0435": "pornographic", "\u043c\u0430\u0442\u0435\u0440\u0438\u0430\u043b\u044b": "materials",
+  "\u0438\u043d\u0442\u0438\u043c\u043d\u044b\u0435": "intimate", "\u0438\u0437\u043e\u0431\u0440\u0430\u0436\u0435\u043d\u0438\u044f": "images", "\u0441\u043e\u0433\u043b\u0430\u0441\u0438\u044f": "consent",
+  "\u043f\u0435\u0440\u0441\u043e\u043d\u0430\u043b\u044c\u043d\u044b\u0435": "personal", "\u043b\u0438\u0447\u043d\u044b\u0435": "personal", "\u0434\u0430\u043d\u043d\u044b\u0435": "data",
+  "\u043f\u043e\u0434\u043d\u044f\u0442\u0438\u0435": "boost", "\u0442\u043e\u043f": "top",
 };
 
 /* ---------- transliteration ---------- */
 
 const TRANSLIT = {
-  "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e", "ё": "yo",
-  "ж": "zh", "з": "z", "и": "i", "й": "y", "к": "k", "л": "l", "м": "m",
-  "н": "n", "о": "o", "п": "p", "р": "r", "с": "s", "т": "t", "у": "u",
-  "ф": "f", "х": "kh", "ц": "ts", "ч": "ch", "ш": "sh", "щ": "shch",
-  "ъ": "", "ы": "y", "ь": "", "э": "e", "ю": "yu", "я": "ya",
+  "\u0430": "a", "\u0431": "b", "\u0432": "v", "\u0433": "g", "\u0434": "d", "\u0435": "e", "\u0451": "yo",
+  "\u0436": "zh", "\u0437": "z", "\u0438": "i", "\u0439": "y", "\u043a": "k", "\u043b": "l", "\u043c": "m",
+  "\u043d": "n", "\u043e": "o", "\u043f": "p", "\u0440": "r", "\u0441": "s", "\u0442": "t", "\u0443": "u",
+  "\u0444": "f", "\u0445": "kh", "\u0446": "ts", "\u0447": "ch", "\u0448": "sh", "\u0449": "shch",
+  "\u044a": "", "\u044b": "y", "\u044c": "", "\u044d": "e", "\u044e": "yu", "\u044f": "ya",
 };
 
 function transliterate(text) {
@@ -334,13 +336,13 @@ function transliterate(text) {
 
 /* ---------- segment translation ---------- */
 
-const RU_DURATION = /^(\d+)\s*(минут[аы]?|час(?:а|ов)?|дн(?:я|ей)?|недел(?:я|и|ю)|месяц(?:а|ев)?)/i;
+const RU_DURATION = /^(\d+)\s*(\u043c\u0438\u043d\u0443\u0442[\u0430\u044b]?|\u0447\u0430\u0441(?:\u0430|\u043e\u0432)?|\u0434\u043d(?:\u044f|\u0435\u0439)?|\u043d\u0435\u0434\u0435\u043b(?:\u044f|\u0438|\u044e)|\u043c\u0435\u0441\u044f\u0446(?:\u0430|\u0435\u0432)?)/i;
 const EN_UNIT = {
-  "минут": "min", "минута": "min", "минуты": "min",
-  "час": "h", "часа": "h", "часов": "h",
-  "день": "d", "дня": "d", "дней": "d",
-  "неделя": "w", "недели": "w", "неделю": "w",
-  "месяц": "mo", "месяца": "mo", "месяцев": "mo",
+  "\u043c\u0438\u043d\u0443\u0442": "min", "\u043c\u0438\u043d\u0443\u0442\u0430": "min", "\u043c\u0438\u043d\u0443\u0442\u044b": "min",
+  "\u0447\u0430\u0441": "h", "\u0447\u0430\u0441\u0430": "h", "\u0447\u0430\u0441\u043e\u0432": "h",
+  "\u0434\u0435\u043d\u044c": "d", "\u0434\u043d\u044f": "d", "\u0434\u043d\u0435\u0439": "d",
+  "\u043d\u0435\u0434\u0435\u043b\u044f": "w", "\u043d\u0435\u0434\u0435\u043b\u0438": "w", "\u043d\u0435\u0434\u0435\u043b\u044e": "w",
+  "\u043c\u0435\u0441\u044f\u0446": "mo", "\u043c\u0435\u0441\u044f\u0446\u0430": "mo", "\u043c\u0435\u0441\u044f\u0446\u0435\u0432": "mo",
 };
 
 function resolveWord(word, platform) {
@@ -357,11 +359,11 @@ export function translateSegment(seg, platform) {
   const prefix = translatePlatformPrefix(t);
   if (prefix) return prefix;
 
-  // guarantee: "♻ 30", "♻️ ∞ Вечная гарантия", "👑 ♻ ∞ Вечная гарантия"
+  // guarantee: "♻ 30", "♻️ ∞ <Lifetime guarantee>", "👑 ♻ ∞ <Lifetime guarantee>"
   if (t.includes("♻")) {
     const num = t.match(/(\d+)/);
     if (num) return `Refill ${num[1]}d`;
-    if (/∞|вечн/i.test(t)) return "Lifetime refill";
+    if (/∞|\u0432\u0435\u0447\u043d/i.test(t)) return "Lifetime refill";
     return "Refill";
   }
   if (t === "❎") return "No refill";
@@ -369,7 +371,7 @@ export function translateSegment(seg, platform) {
   // decorative emoji prefixes carry meaning only for a few known cases
   if (t === "👑") return "Real";
 
-  if (!/[а-яё]/i.test(t)) return t;
+  if (!/[\u0430-\u044f\u0451]/i.test(t)) return t;
 
   const low = t.toLowerCase();
 
@@ -377,31 +379,31 @@ export function translateSegment(seg, platform) {
   if (phrase === "FOLLOWERS_OR_MEMBERS") return platform === "telegram" ? "Members" : "Followers";
   if (phrase) return phrase;
 
-  // durations: "1 час", "30 минут", "на 30 дней", "на 7 дней"
+  // durations: "1 <hour>", "30 <minutes>", "for 30 <days>", "for 7 <days>"
   const dur = t.match(RU_DURATION);
   if (dur) {
     const unit = EN_UNIT[dur[2].toLowerCase()] ?? dur[2];
     const span = `${dur[1]}${unit}`;
-    return /^на\s/i.test(t) ? `For ${span}` : span;
+    return /^\u043d\u0430\s/i.test(t) ? `For ${span}` : span;
   }
 
-  // geo: flag + country, "Для региона X"
-  const geoMatch = t.match(/[а-яё]+(?:\s[а-яё]+)?/i);
+  // geo: flag + country, "<For region> X"
+  const geoMatch = t.match(/[\u0430-\u044f\u0451]+(?:\s[\u0430-\u044f\u0451]+)?/i);
   if (geoMatch) {
     const geoPhrase = COUNTRIES[geoMatch[0].toLowerCase()];
-    if (geoPhrase && /^\D{0,4}\s*[а-яё]/i.test(t) && t.length < 40) {
-      return /^для региона/i.test(t) ? `${geoPhrase} region` : geoPhrase;
+    if (geoPhrase && /^\D{0,4}\s*[\u0430-\u044f\u0451]/i.test(t) && t.length < 40) {
+      return /^\u0434\u043b\u044f \u0440\u0435\u0433\u0438\u043e\u043d\u0430/i.test(t) ? `${geoPhrase} region` : geoPhrase;
     }
   }
 
-  // trailing spans: "на 90 дней", "на 50 будущих постов"
+  // trailing spans: "for 90 <days>", "for 50 <upcoming posts>"
   let working = t
-    .replace(/на\s+(\d+)\s+(?:будущих\s+|последние\s+)?постов?/gi, "for $1 posts")
-    .replace(/на\s+(\d+)\s+(?:дней|дня|день)/gi, "for $1d");
+    .replace(/\u043d\u0430\s+(\d+)\s+(?:\u0431\u0443\u0434\u0443\u0449\u0438\u0445\s+|\u043f\u043e\u0441\u043b\u0435\u0434\u043d\u0438\u0435\s+)?\u043f\u043e\u0441\u0442\u043e\u0432?/gi, "for $1 posts")
+    .replace(/\u043d\u0430\s+(\d+)\s+(?:\u0434\u043d\u0435\u0439|\u0434\u043d\u044f|\u0434\u0435\u043d\u044c)/gi, "for $1d");
 
   // word-level fallback
   const words = working.split(/(\s+|\/|[(,)])/).map((tok) => {
-    if (!/[а-яё]/i.test(tok)) return tok;
+    if (!/[\u0430-\u044f\u0451]/i.test(tok)) return tok;
     const stripped = tok.toLowerCase().replace(/[.,;:]+$/, "");
     return resolveWord(stripped, platform) ?? transliterate(tok);
   }).join("");

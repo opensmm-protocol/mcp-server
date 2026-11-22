@@ -4,14 +4,14 @@ about: Report a public OpenSMM node URL for the weekly census
 title: '[Node]: '
 ---
 
-### URL узла
+### Node URL
 
 <!-- Public base URL of the node, e.g. https://node.example.org (redirects are not followed) -->
 
-### Как запущен (source/docker)
+### How it is run (source/docker)
 
 <!-- source / docker -->
 
-### Контакт по желанию
+### Contact (optional)
 
 <!-- Telegram, email, GitHub handle or any preferred contact (optional) -->
