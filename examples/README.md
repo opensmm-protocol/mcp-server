@@ -140,6 +140,9 @@ local node and its mock catalog, with no keys or money:
   [`.cursor/mcp.json`](cursor/.cursor/mcp.json) (`npm run gateway`).
 - [LangChain-style agent](langchain/README.md) — a runnable
   [tool-calling script](langchain/agent.mjs): catalog → quote → order → replay.
+- [ElizaOS](eliza/README.md) — a copy-paste
+  [plugin](eliza/plugin.mjs) with search / quote / order actions and a
+  [smoke test](eliza/smoke.mjs) against a node.
 - [n8n](n8n/README.md) — an importable
   [workflow](n8n/workflow.json) with HTTP Request nodes and a mock-only guard.
 
