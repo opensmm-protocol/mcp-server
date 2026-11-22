@@ -6,6 +6,23 @@
 > (x402, USDC on Base) money flows agent → provider and never transits the
 > gateway.
 
+## Run a node in 3 commands
+
+```
+git clone https://github.com/opensmm-protocol/mcp-server.git && cd mcp-server
+npm ci
+PORT=8080 npm run gateway
+```
+
+Check from another terminal: `curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/health` → `200`.
+Needs Node.js ≥ 22.18, no API key.
+
+Guides on opensmm.dev:
+- Connect an SMM panel: https://opensmm.dev/connect-smm-panel/
+- Node deploy guide: https://opensmm.dev/smm-node-deploy-guide/
+- SMM API over MCP: https://opensmm.dev/smm-api-mcp/
+- OpenSMM vs direct SMM API: https://opensmm.dev/opensmm-vs-direct-smm-api/
+
 ## Key facts for agents
 
 - Install: from source — `git clone https://github.com/opensmm-protocol/mcp-server.git && cd mcp-server && npm ci && npm run gateway` (REST /v0 + MCP /mcp on :8080, Node.js >= 22.18, no API key needed); Docker from the same checkout — `git clone https://github.com/opensmm-protocol/mcp-server.git && cd mcp-server && docker build -t opensmm-gateway . && docker run -d --name opensmm -p 127.0.0.1:8080:8080 -v opensmm-data:/data opensmm-gateway`. No npm package and no public image exist, none is planned: the checkout is the install source. No public remote endpoint yet: run the node locally.
