@@ -16,6 +16,23 @@ agent over Claude Desktop, Cursor, LangChain or n8n.
 **For supply nodes:** [`docs/PROVIDER_ONBOARDING.md`](./docs/PROVIDER_ONBOARDING.md) —
 zero-code registration, including a copy-paste prompt for your AI assistant.
 
+## Запусти узел за 3 команды / Run a node in 3 commands
+
+```bash
+git clone https://github.com/opensmm-protocol/mcp-server.git && cd mcp-server
+npm ci
+PORT=8080 npm run gateway
+```
+
+Check from another terminal: `curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/health` → `200`.
+Needs Node.js ≥ 22.18, no API key.
+
+Guides on opensmm.dev:
+[connect an SMM panel](https://opensmm.dev/connect-smm-panel/) ·
+[node deploy guide](https://opensmm.dev/smm-node-deploy-guide/) ·
+[SMM API over MCP](https://opensmm.dev/smm-api-mcp/) ·
+[OpenSMM vs direct SMM API](https://opensmm.dev/opensmm-vs-direct-smm-api/)
+
 ## Install / Connect
 
 ```bash
