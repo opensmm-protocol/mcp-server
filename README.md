@@ -16,7 +16,7 @@ agent over Claude Desktop, Cursor, LangChain or n8n.
 **For supply nodes:** [`docs/PROVIDER_ONBOARDING.md`](./docs/PROVIDER_ONBOARDING.md) —
 zero-code registration, including a copy-paste prompt for your AI assistant.
 
-## Запусти узел за 3 команды / Run a node in 3 commands
+## Run a node in 3 commands
 
 ```bash
 git clone https://github.com/opensmm-protocol/mcp-server.git && cd mcp-server

@@ -1,7 +1,5 @@
 # Order an SMM service from an agent in 5 minutes
 
-> «Заказ SMM-услуги из агента за 5 минут» — короткий гайд для разработчика агента.
-
 Everything below runs on a **local node and its mock catalog**. Every service
 is marked `synthetic: true`, no real order is executed, no API key, account or
 money is needed. Orders stay `REQUIRES_PAYMENT` and are never paid.

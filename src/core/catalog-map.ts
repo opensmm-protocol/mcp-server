@@ -21,10 +21,10 @@ const PLATFORM_KEYWORDS: [RegExp, Platform][] = [
 const OBJECTIVE_KEYWORDS: [RegExp, Objective][] = [
   [/member|subscriber/i, "members"],
   [/follower/i, "followers"],
-  [/like|лайк/i, "likes"],
-  [/view|watch|impression|просмотр/i, "views"],
-  [/reaction|реакци/i, "reactions"],
-  [/comment|комментар/i, "comments"],
+  [/like|\u043b\u0430\u0439\u043a/i, "likes"],
+  [/view|watch|impression|\u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440/i, "views"],
+  [/reaction|\u0440\u0435\u0430\u043a\u0446\u0438/i, "reactions"],
+  [/comment|\u043a\u043e\u043c\u043c\u0435\u043d\u0442\u0430\u0440/i, "comments"],
 ];
 
 export function inferPlatform(text: string): Platform {
@@ -35,8 +35,9 @@ export function inferPlatform(text: string): Platform {
 }
 
 export function inferObjective(text: string, platform?: Platform): Objective {
-  // RU catalogs label both Telegram members and site followers as «подписчики».
-  if (/подписчик/i.test(text)) return platform === "telegram" ? "members" : "followers";
+  // Russian-language catalogs label both Telegram members and site followers
+  // with one word for "subscribers" (written as \u escapes below).
+  if (/\u043f\u043e\u0434\u043f\u0438\u0441\u0447\u0438\u043a/i.test(text)) return platform === "telegram" ? "members" : "followers";
   for (const [re, objective] of OBJECTIVE_KEYWORDS) {
     if (re.test(text)) return objective;
   }
