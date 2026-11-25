@@ -1,6 +1,7 @@
 # OpenSMM Protocol
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
+[![opensmm-protocol/mcp-server MCP server](https://glama.ai/mcp/servers/opensmm-protocol/mcp-server/badges/score.svg)](https://glama.ai/mcp/servers/opensmm-protocol/mcp-server)
 
 > **Open, provider-neutral protocol for ordering and executing social media growth services by AI agents.**
 > MCP is one way to connect — not the product itself.
