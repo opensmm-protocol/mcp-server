@@ -435,6 +435,25 @@ describe("bin/opensmm.mjs doctor — panel check in one command", () => {
     assert.equal(output.includes(".env not found"), false);
   });
 
+  it("runs the diagnostics for `npm run doctor --url ... --profile ...` without `--`", () => {
+    for (const extra of [[], ["--profile", "standard"]]) {
+      const result = spawnSync(
+        "npm",
+        ["run", "doctor", "--url", "http://127.0.0.1:1/api/v2", ...extra],
+        {
+          cwd: REPO_ROOT,
+          env: { ...CLEAN_ENV, OPENSMM_PANEL_KEY: "dummy-key-123" },
+          encoding: "utf8",
+          timeout: 60_000,
+        },
+      );
+
+      assert.equal(result.status, 1, "an unreachable panel still exits 1");
+      assert.match(result.stdout, /Target: http:\/\/127\.0\.0\.1:1\/api\/v2/);
+      assert.doesNotMatch(result.stderr, /Unexpected/);
+    }
+  });
+
   it("documents the environment form of the doctor in `--help` and exits 0", () => {
     const result = runCli(["doctor", "--help"]);
     assert.equal(result.status, 0);
