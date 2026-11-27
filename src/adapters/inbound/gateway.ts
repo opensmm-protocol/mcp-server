@@ -4,7 +4,7 @@
  * This is the deployment shape for a hosted gateway (docs/DEPLOY.md).
  *
  * Run: `npm run gateway` (PORT env, default 8080) or
- * `npx -y @opensmm/mcp-server gateway --port 8080`
+ * `node bin/opensmm.mjs gateway --port 8080` from a source checkout
  * (CLI flags, see bin/opensmm.mjs).
  */
 
