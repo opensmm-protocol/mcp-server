@@ -553,6 +553,84 @@ describe("provider-doctor: Level-0 panel pre-onboarding checks", () => {
       restore();
     }
   });
+
+  const BARE_URL = "https://bare-panel.example/api/v2";
+
+  for (const [label, args, profile] of [
+    ["URL and profile", [BARE_URL, "extended"], "extended"],
+    ["profile before URL", ["extended", BARE_URL], "extended"],
+    ["URL only", [BARE_URL], "standard"],
+    ["bare URL with --profile", [BARE_URL, "--profile", "extended"], "extended"],
+    ["--url with bare profile", ["--url", BARE_URL, "extended"], "extended"],
+  ] as const) {
+    it(`accepts what npm forwards without \`--\`: ${label}`, async () => {
+      const restore = withEnv({
+        OPENSMM_PANEL_KEY: "BARE_FORM_KEY_123",
+        OPENSMM_PANEL_URL: "https://env-panel.example/api/v2",
+      });
+      const received = { keys: [] as string[], urls: [] as string[] };
+      const loggedOutputs: string[] = [];
+
+      try {
+        const exitCode = await runDoctorCli(
+          [...args],
+          recordingPanel(received),
+          (msg) => loggedOutputs.push(msg),
+          (err) => loggedOutputs.push(err),
+        );
+
+        assert.equal(exitCode, 0);
+        assert.deepEqual(new Set(received.urls), new Set([BARE_URL]));
+        const output = loggedOutputs.join("\n");
+        // The report names the configured profile only when it differs from the suggested one.
+        if (profile === "standard") assert.doesNotMatch(output, /Configured profile/);
+        else assert.match(output, new RegExp(`Configured profile: ${profile}`));
+      } finally {
+        restore();
+      }
+    });
+  }
+
+  for (const [label, args] of [
+    ["a stray value", ["STRAY_SECRET_VALUE"]],
+    ["a stray value after the URL", [BARE_URL, "STRAY_SECRET_VALUE"]],
+    ["a non-http URL", ["ftp://STRAY_SECRET_VALUE.example"]],
+    ["a URL without slashes", ["https:STRAY_SECRET_VALUE"]],
+    ["a second URL", [BARE_URL, "https://STRAY_SECRET_VALUE.example"]],
+    ["a URL next to --url", ["--url", BARE_URL, "https://STRAY_SECRET_VALUE.example"]],
+    ["a second profile name", [BARE_URL, "standard", "extended"]],
+    ["a profile name next to --profile", ["--profile", "standard", "extended"]],
+    ["an inherited object key", [BARE_URL, "toString"]],
+  ] as const) {
+    it(`rejects ${label} as a positional argument without printing it`, async () => {
+      const restore = withEnv({
+        OPENSMM_PANEL_KEY: "BARE_FORM_KEY_123",
+        OPENSMM_PANEL_URL: "https://env-panel.example/api/v2",
+      });
+      const received = { keys: [] as string[], urls: [] as string[] };
+      const loggedOutputs: string[] = [];
+      const loggedErrors: string[] = [];
+
+      try {
+        const exitCode = await runDoctorCli(
+          [...args],
+          recordingPanel(received),
+          (msg) => loggedOutputs.push(msg),
+          (err) => loggedErrors.push(err),
+        );
+
+        assert.equal(exitCode, 1);
+        assert.deepEqual(received.urls, [], "no request may be sent");
+        assert.deepEqual(loggedOutputs, []);
+        const errors = loggedErrors.join("\n");
+        assert.match(errors, /Unexpected positional argument \(value hidden\)/);
+        assert.equal(errors.includes("STRAY_SECRET_VALUE"), false);
+        assert.equal(errors.includes("toString"), false);
+      } finally {
+        restore();
+      }
+    });
+  }
 });
 
 describe("provider-profile example (docs onboarding entry point)", () => {

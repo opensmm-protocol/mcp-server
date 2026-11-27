@@ -92,3 +92,75 @@ jobs:
               *) echo "id=$id: no result in response" >&2; exit 1 ;;
             esac
           done
+
+  # Proves the bundle that `registry-publish.yml` releases: build it, unpack it
+  # outside the repository and talk MCP to it. Node 22 is the oldest supported.
+  mcpb:
+    name: Build and smoke the MCP bundle
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build the bundle
+        run: npm run build:mcpb
+
+      - name: Smoke initialize and tools/list over stdio
+        run: |
+          set -euo pipefail
+          node scripts/smoke-mcpb.mjs build/*.mcpb
+
+  # ZHC-1438: asks the release autopilot to run, only when every CI job above is
+  # green and the last release tag is at least 60 minutes old; otherwise it ends
+  # silently (the daily scheduled run picks the changes up). It never fails CI.
+  # No secret = disabled. Rollback: revert the PR that added this job.
+  release-trigger:
+    name: release trigger
+    needs: [test, container, mcp-stdio, mcpb]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Call the release webhook
+        uses: actions/github-script@v7
+        continue-on-error: true
+        env:
+          RELEASE_WEBHOOK_URL: ${{ secrets.RELEASE_WEBHOOK_URL }}
+        with:
+          script: |
+            const url = process.env.RELEASE_WEBHOOK_URL;
+            if (!url) return core.info('release webhook is not configured');
+            const tags = await github.paginate(github.rest.repos.listTags, { ...context.repo, per_page: 100 });
+            const version = (t) => t.name.slice(1).split('.').map(Number);
+            const [last] = tags
+              .filter((t) => /^v\d+\.\d+\.\d+$/.test(t.name))
+              .sort((a, b) => {
+                const [x, y] = [version(a), version(b)];
+                return y[0] - x[0] || y[1] - x[1] || y[2] - x[2];
+              });
+            if (last) {
+              const { data } = await github.rest.repos.getCommit({ ...context.repo, ref: last.commit.sha });
+              const minutes = (Date.now() - Date.parse(data.commit.committer.date)) / 60000;
+              if (minutes < 60) return core.info(`${last.name} is younger than 60 minutes`);
+            }
+            try {
+              const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Idempotency-Key': `${context.repo.repo}-${context.sha}` },
+                body: JSON.stringify({ repository: `${context.repo.owner}/${context.repo.repo}`, sha: context.sha }),
+                signal: AbortSignal.timeout(20000),
+              });
+              if (!res.ok) return core.warning(`release webhook answered HTTP ${res.status}`);
+              core.info('release webhook called');
+            } catch {
+              core.warning('release webhook is unreachable');
+            }

@@ -9,6 +9,9 @@
  *   OPENSMM_PANEL_KEY=KEY OPENSMM_PANEL_URL=https://panel.example/api/v2 npm run doctor
  *   OPENSMM_PANEL_KEY=KEY node bin/opensmm.mjs doctor --url https://panel.example/api/v2
  *   --url / --key stay available and take priority over the environment.
+ *   `npm run doctor` needs `--` before any flag. Without it npm keeps --url and
+ *   --profile and forwards only their values, so one bare http(s) URL and one
+ *   profile name are accepted as positional arguments too.
  *
  * Performs read-only pre-onboarding diagnostics against an SMM API v2 endpoint:
  *   (1) HTTPS reachability + JSON vs HTML/Cloudflare detection
@@ -591,7 +594,7 @@ export function formatDoctorReport(result: DoctorResult): string {
 }
 
 /** How an operator is expected to invoke the doctor (npm script or the CLI). */
-export const DOCTOR_USAGE = `Usage: OPENSMM_PANEL_KEY=<key> npm run doctor [--url <url>] [--profile standard]
+export const DOCTOR_USAGE = `Usage: OPENSMM_PANEL_KEY=<key> npm run doctor [-- --url <url> --profile standard]
        OPENSMM_PANEL_KEY=<key> opensmm doctor [--url <url>] [--profile standard]
 
 The panel key is read from OPENSMM_PANEL_KEY and the endpoint from
@@ -600,6 +603,29 @@ An inline OPENSMM_PANEL_KEY=... assignment is still visible in ps and the shell
 history: load a gitignored .env.panel (set -a; . ./.env.panel; set +a) or type
 the key without echo (read -rs OPENSMM_PANEL_KEY; export OPENSMM_PANEL_KEY).
 The --key / --url flags override the environment.`;
+
+/**
+ * Map bare arguments to the endpoint URL and the profile name. This is what the
+ * script receives from `npm run doctor --url <url> --profile <name>` (no `--`).
+ * Returns undefined for anything else, including a value already set by a flag.
+ * A rejected value may be the panel key, so the caller must not print it.
+ */
+function readPositionals(
+  positionals: string[],
+  flags: { url?: string; profile?: string },
+): { url?: string; profile?: string } | undefined {
+  let { url, profile } = flags;
+  for (const arg of positionals) {
+    if (url === undefined && /^https?:\/\//i.test(arg) && URL.canParse(arg)) {
+      url = arg;
+    } else if (profile === undefined && Object.hasOwn(PROFILES, arg)) {
+      profile = arg;
+    } else {
+      return undefined;
+    }
+  }
+  return { url, profile };
+}
 
 /**
  * CLI execution handler.
@@ -626,19 +652,17 @@ export async function runDoctorCli(
       options: {
         url: { type: "string" },
         key: { type: "string" },
-        profile: { type: "string", default: "standard" },
+        profile: { type: "string" },
         help: { type: "boolean", short: "h" },
       },
-      allowPositionals: false,
+      allowPositionals: true,
     });
     parsed = {
       values: {
         url: typeof rawParsed.values.url === "string" ? rawParsed.values.url : undefined,
         key: typeof rawParsed.values.key === "string" ? rawParsed.values.key : undefined,
         profile:
-          typeof rawParsed.values.profile === "string"
-            ? rawParsed.values.profile
-            : "standard",
+          typeof rawParsed.values.profile === "string" ? rawParsed.values.profile : undefined,
         help: Boolean(rawParsed.values.help),
       },
       positionals: rawParsed.positionals,
@@ -650,6 +674,15 @@ export async function runDoctorCli(
   }
 
   const { values } = parsed;
+  const target = readPositionals(parsed.positionals, values);
+
+  if (!target) {
+    errFn(
+      "Error: Unexpected positional argument (value hidden). Only one http(s) URL and one profile name are accepted, each only if not already set by a flag.",
+    );
+    errFn(DOCTOR_USAGE);
+    return 1;
+  }
 
   if (values.help) {
     logFn(DOCTOR_USAGE);
@@ -662,7 +695,7 @@ export async function runDoctorCli(
     return 0;
   }
 
-  const url = values.url ?? process.env.OPENSMM_PANEL_URL;
+  const url = target.url ?? process.env.OPENSMM_PANEL_URL;
   const key = values.key ?? process.env.OPENSMM_PANEL_KEY;
 
   if (!url || !key) {
@@ -681,7 +714,7 @@ export async function runDoctorCli(
     const result = await diagnoseProvider({
       url,
       key,
-      profile: values.profile,
+      profile: target.profile,
       fetchImpl,
     });
 

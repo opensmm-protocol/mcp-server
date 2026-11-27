@@ -8,9 +8,9 @@
  * `server.json`:
  *
  *   - all three agree      → `version=<X.Y.Z>`, `publish=true`, exit 0;
- *   - any of them differs  → `::notice title=npm publish skipped::…`,
- *                            `publish=false`, exit 0 (npm and the registry are
- *                            skipped, the run stays green);
+ *   - any of them differs  → `::notice title=release publish skipped::…`,
+ *                            `publish=false`, exit 0 (the calling job
+ *                            publishes nothing, the run stays green);
  *   - not a `v*` tag       → `::error::…`, exit 1 (a workflow misconfiguration).
  *
  * Outputs go to `$GITHUB_OUTPUT` when the variable is set, to stdout otherwise.
@@ -28,7 +28,7 @@ function setOutput(name, value) {
 }
 
 function skip(message) {
-  console.error(`::notice title=npm publish skipped::${message}`);
+  console.error(`::notice title=release publish skipped::${message}`);
   setOutput("publish", "false");
 }
 
@@ -47,12 +47,12 @@ if (refType !== "tag" || !refName.startsWith("v") || refName.length < 2) {
   if (tagVersion !== pkgVersion) {
     skip(
       `Tag ${refName} does not match package.json version ${pkgVersion}; ` +
-        "skipping npm publish instead of failing the run.",
+        "skipping publication instead of failing the run.",
     );
   } else if (manifestVersion !== pkgVersion) {
     skip(
       `server.json version ${manifestVersion} does not match package.json version ${pkgVersion}; ` +
-        "skipping npm publish instead of failing the run.",
+        "skipping publication instead of failing the run.",
     );
   } else {
     setOutput("publish", "true");

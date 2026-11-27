@@ -3,6 +3,8 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { describe, it } from "node:test";
+// @ts-expect-error: untyped .mjs script
+import { repositoryManifestErrors } from "../scripts/validate-server-manifest.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 const validator = path.join(repoRoot, "scripts", "validate-server-manifest.mjs");
@@ -54,6 +56,26 @@ describe("registry manifest validator", () => {
 
   it("rejects a package with a blank identifier", () => {
     assertRejected("broken-identifier.json", "/packages/0/identifier must be a non-empty string");
+  });
+
+  it("rejects an mcpb package that is not a GitHub release asset", () => {
+    assertRejected("broken-mcpb-url.json", "/packages/0/identifier must be an https GitHub release asset URL");
+  });
+
+  it("rejects an mcpb package with registryBaseUrl", () => {
+    assertRejected("broken-mcpb-base-url.json", "/packages/0/registryBaseUrl must be absent");
+  });
+
+  it("holds the repository manifest to the package version and keeps the hash out of it", () => {
+    const manifest = JSON.parse(fs.readFileSync(path.join(repoRoot, "server.json"), "utf8"));
+    assert.deepEqual(repositoryManifestErrors(manifest, manifest.version), []);
+    assert.match(manifest.description, /mock catalog/);
+
+    const stale = repositoryManifestErrors(manifest, "9.9.9").join("\n");
+    assert.match(stale, /identifier must be \S+\/v9\.9\.9\/opensmm-mcp-server-9\.9\.9\.mcpb/);
+
+    manifest.packages[0].fileSha256 = "0".repeat(64);
+    assert.match(repositoryManifestErrors(manifest, manifest.version).join("\n"), /fileSha256 must be absent/);
   });
 
   it("rejects a manifest that declares remotes", () => {
