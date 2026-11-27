@@ -237,7 +237,7 @@ describe("bin/opensmm.mjs gateway — a node in one command", () => {
     const result = runCli(["deploy"]);
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /unknown command: deploy/);
-    assert.match(result.stderr, /Usage: opensmm/);
+    assert.match(result.stderr, /Usage: node bin\/opensmm\.mjs/);
   });
 
   it("rejects a bad --port value", () => {
