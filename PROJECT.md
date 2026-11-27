@@ -39,6 +39,15 @@ protocol.
 - x402: rail with mock facilitator done incl. `SETTLEMENT_PENDING`;
   no real facilitator configured yet (roadmap #8 partially open).
 
+## MCP Registry
+
+- Listed as `io.github.opensmm-protocol/mcp-server` in the official MCP
+  Registry; first version 0.1.8, `active` since 2026-11-27.
+- Package: `.mcpb` bundle attached to the GitHub Release `v0.1.8` (MCP over
+  stdio, mock catalog, Node.js >= 22.18, no keys). No npm package, no public
+  image, no public remote.
+- Publication and verification: [`docs/REGISTRY.md`](./docs/REGISTRY.md).
+
 ## Roadmap
 
 Next increment (sub-issues of epic ZHC-47, stage 1):
