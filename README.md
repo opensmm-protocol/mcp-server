@@ -88,7 +88,7 @@ Execution providers        ← SMM API v2 panels, native providers, ...
 
 ## Run a node from source in 5 minutes
 
-There is one install source — a checkout of this repository. With Node.js
+A node is installed from a checkout of this repository. With Node.js
 ≥ 22.18 that is all you need; the Docker one-liner right below builds the same
 node from the same checkout. No local Node.js, Docker or domain? Open the repo
 in GitHub Codespaces — the devcontainer installs dependencies and forwards
@@ -248,8 +248,8 @@ checkout:
 
 (run `npm run build` once in the checkout — the entry point runs `dist/`,
 because Node refuses TypeScript type stripping inside `node_modules`).
-There is no npm package to install instead: the config always points at a
-checkout, which is the only install route.
+This config points at a checkout. To run the MCP server without a clone, use
+the `.mcpb` bundle — see [How agents find us](#how-agents-find-us).
 
 Tools: `get_capabilities`, `list_providers`, `register_provider`,
 `search_services`, `compare_offers`, `get_service`, `get_quote`, `create_order`,
@@ -416,19 +416,33 @@ Key properties (enforced by tests):
 
 ## How agents find us
 
-Three entry points, any of them leads to the same server:
+Four entry points, all of them lead to the same server code:
 
+- **MCP Registry** — the official registry lists
+  `io.github.opensmm-protocol/mcp-server`; its package is an MCP Bundle
+  (`.mcpb`) attached to the GitHub Release (see below).
 - **Source checkout** — `git clone … && npm ci && npm run gateway` (or the
-  Docker one-liner above). No npm package exists: the checkout is the install.
+  Docker one-liner above). This is the way to run a node.
 - **`llms.txt`** — [`llms.txt`](./llms.txt) is the compact machine-readable
   summary of the protocol, the tools and the docs.
 - **Website** — <https://opensmm.dev> for the human-facing view of the same
   material.
 
-There is no MCP Registry entry and none can appear until there is a published
-package or a public hosted endpoint; the node is installed from source — see
-[Run a node from source in 5 minutes](#run-a-node-from-source-in-5-minutes).
-Details: [`docs/REGISTRY.md`](./docs/REGISTRY.md).
+### Install the MCP bundle (`.mcpb`)
+
+The bundle is the MCP server over stdio on the **mock catalog**: no real
+services, orders or payments. It needs Node.js ≥ 22.18, and no clone or keys.
+Download version 0.1.8 from the GitHub Release:
+
+```bash
+curl -fLO https://github.com/opensmm-protocol/mcp-server/releases/download/v0.1.8/opensmm-mcp-server-0.1.8.mcpb
+```
+
+Open the file in an MCP client that installs `.mcpb` bundles, such as Claude
+Desktop. For any other stdio client, unpack the file (it is a zip archive) and
+configure the command `node /path/to/unpacked/bin/opensmm.mjs mcp`.
+How to check the SHA-256 and find the latest version:
+[`docs/REGISTRY.md`](./docs/REGISTRY.md).
 
 ## Roadmap
 

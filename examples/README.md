@@ -95,8 +95,8 @@ one of the following configuration blocks to your client's settings
 (e.g., `claude_desktop_config.json` or `.cursor/mcp.json`).
 
 The server configuration aligns with [`../mcp.json`](../mcp.json)
-(`io.github.opensmm-protocol/mcp-server`, package `@opensmm/mcp-server`), which
-registers the stdio transport.
+(`io.github.opensmm-protocol/mcp-server`, an `.mcpb` bundle), which declares the
+stdio transport. The configs below run a checkout instead of the bundle.
 
 #### Stdio transport (direct process)
 
