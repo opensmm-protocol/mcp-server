@@ -79,7 +79,7 @@ describe("release version gate", () => {
 
     assert.equal(result.status, 0, "a version mismatch must not fail the run");
     assert.equal(result.outputs.publish, "false");
-    assert.match(result.stderr, /::notice title=npm publish skipped::/);
+    assert.match(result.stderr, /::notice title=release publish skipped::/);
     assert.match(result.stderr, /v9\.9\.9/);
   });
 
@@ -111,14 +111,17 @@ describe("release version gate", () => {
 });
 
 describe("release version", () => {
-  it("is the same in src/version.ts, package.json and server.json", () => {
+  it("is the same in src/version.ts, package.json, package-lock.json and server.json", () => {
     const pkg = readJson("package.json");
     const manifest = readJson("server.json");
-    const packages = manifest.packages as { version?: string }[];
+    const packages = manifest.packages as { identifier: string }[];
 
     assert.equal(VERSION, pkg.version);
     assert.equal(manifest.version, pkg.version);
-    assert.equal(packages[0]?.version, pkg.version);
+    assert.ok(packages[0]?.identifier.endsWith(`/v${pkg.version}/opensmm-mcp-server-${pkg.version}.mcpb`));
+    const lock = readJson("package-lock.json") as { version: string; packages: Record<string, { version: string }> };
+    assert.equal(lock.version, pkg.version);
+    assert.equal(lock.packages[""]?.version, pkg.version);
   });
 
   it("keeps the manifest mirrors byte-for-byte equal to server.json", () => {

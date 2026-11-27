@@ -93,13 +93,39 @@ jobs:
             esac
           done
 
+  # Proves the bundle that `registry-publish.yml` releases: build it, unpack it
+  # outside the repository and talk MCP to it. Node 22 is the oldest supported.
+  mcpb:
+    name: Build and smoke the MCP bundle
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build the bundle
+        run: npm run build:mcpb
+
+      - name: Smoke initialize and tools/list over stdio
+        run: |
+          set -euo pipefail
+          node scripts/smoke-mcpb.mjs build/*.mcpb
+
   # ZHC-1438: asks the release autopilot to run, only when every CI job above is
   # green and the last release tag is at least 60 minutes old; otherwise it ends
   # silently (the daily scheduled run picks the changes up). It never fails CI.
   # No secret = disabled. Rollback: revert the PR that added this job.
   release-trigger:
     name: release trigger
-    needs: [test, container, mcp-stdio]
+    needs: [test, container, mcp-stdio, mcpb]
     if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
     runs-on: ubuntu-latest
     timeout-minutes: 5

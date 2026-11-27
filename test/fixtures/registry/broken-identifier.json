@@ -11,10 +11,8 @@
   },
   "packages": [
     {
-      "registryType": "npm",
+      "registryType": "mcpb",
       "identifier": "   ",
-      "version": "0.1.0",
-      "runtimeHint": "npx",
       "transport": {
         "type": "stdio"
       }

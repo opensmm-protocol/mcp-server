@@ -304,10 +304,10 @@ describe("examples/README.md — MCP client configuration (ZHC-680)", () => {
       "stdio",
       "mcp.json declares stdio transport",
     );
-    assert.equal(
+    assert.match(
       mcpManifest.packages?.[0]?.identifier,
-      "@opensmm/mcp-server",
-      "mcp.json declares package identifier @opensmm/mcp-server",
+      /\/releases\/download\/v[\d.]+\/opensmm-mcp-server-[\d.]+\.mcpb$/,
+      "mcp.json declares the released MCP bundle",
     );
   });
 });

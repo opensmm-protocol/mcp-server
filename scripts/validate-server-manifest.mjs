@@ -7,9 +7,14 @@
  * so validation never touches the network. On top of the schema, this script
  * enforces the project rules that the registry schema leaves open:
  *   - every `packages[]` entry has a non-empty `identifier`;
+ *   - an `mcpb` package is an https GitHub release asset URL containing "mcp",
+ *     without `registryBaseUrl`;
  *   - `remotes` is absent or empty (the entry is package-only until a public
  *     remote endpoint exists);
  *   - `title` and `description` stay within the registry limit of 100 chars.
+ *
+ * The repository `server.json` must also be exactly one stdio `mcpb` package
+ * whose URL matches the `package.json` version, with no committed `fileSha256`.
  *
  * Usage:
  *   node scripts/validate-server-manifest.mjs [path-to-server.json]
@@ -22,6 +27,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import Ajv from "ajv";
 import addFormats from "ajv-formats";
+import { bundleName } from "./build-mcpb.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 
@@ -29,9 +35,53 @@ export const DEFAULT_MANIFEST_PATH = path.resolve(scriptDir, "..", "server.json"
 export const PACKAGE_JSON_PATH = path.resolve(scriptDir, "..", "package.json");
 export const SCHEMA_PATH = path.join(scriptDir, "schemas", "server-2025-12-11.schema.json");
 export const MAX_TEXT_LENGTH = 100;
+const RELEASES_URL = "https://github.com/opensmm-protocol/mcp-server/releases/download";
+const GITHUB_ASSET_PATH = /^\/[^/]+\/[^/]+\/releases\/download\/[^/]+\/[^/]+$/;
 
 function readJson(filePath) {
   return JSON.parse(readFileSync(filePath, "utf8"));
+}
+
+function mcpbErrors(pkg, index) {
+  const errors = [];
+  const url = URL.parse(pkg.identifier);
+  if (
+    url?.protocol !== "https:" ||
+    url.host !== "github.com" ||
+    !GITHUB_ASSET_PATH.test(url.pathname) ||
+    !pkg.identifier.toLowerCase().includes("mcp")
+  ) {
+    errors.push(`/packages/${index}/identifier must be an https GitHub release asset URL containing "mcp"`);
+  }
+  if (pkg.registryBaseUrl !== undefined) {
+    errors.push(`/packages/${index}/registryBaseUrl must be absent for an mcpb package`);
+  }
+  return errors;
+}
+
+/**
+ * Rules for the tracked `server.json` only: fixtures and the publish copy
+ * (which carries `fileSha256`) are not held to them.
+ *
+ * @returns {string[]} errors
+ */
+export function repositoryManifestErrors(manifest, version) {
+  const errors = [];
+  if (manifest?.version !== version) {
+    errors.push(`/version must equal the package.json version ${version}`);
+  }
+  if (manifest?.packages?.length !== 1) {
+    errors.push("/packages must hold exactly one package");
+  }
+  const pkg = manifest?.packages?.[0];
+  if (pkg?.registryType !== "mcpb") errors.push('/packages/0/registryType must be "mcpb"');
+  if (pkg?.transport?.type !== "stdio") errors.push('/packages/0/transport/type must be "stdio"');
+  const expected = `${RELEASES_URL}/v${version}/${bundleName(version)}`;
+  if (pkg?.identifier !== expected) errors.push(`/packages/0/identifier must be ${expected}`);
+  for (const field of ["version", "runtimeHint", "fileSha256"]) {
+    if (pkg?.[field] !== undefined) errors.push(`/packages/0/${field} must be absent from the tracked manifest`);
+  }
+  return errors;
 }
 
 /**
@@ -83,6 +133,8 @@ export function validateManifest(manifestPath = DEFAULT_MANIFEST_PATH) {
     packages.forEach((pkg, index) => {
       if (typeof pkg?.identifier !== "string" || pkg.identifier.trim() === "") {
         errors.push(`/packages/${index}/identifier must be a non-empty string`);
+      } else if (pkg.registryType === "mcpb") {
+        errors.push(...mcpbErrors(pkg, index));
       }
     });
   }
@@ -115,6 +167,9 @@ export function validateManifest(manifestPath = DEFAULT_MANIFEST_PATH) {
       );
     } else if (pkg.mcpName !== manifest?.name) {
       errors.push(`/package.json mcpName ("${pkg.mcpName}") must equal the manifest name ("${manifest?.name}")`);
+    }
+    if (resolvedPath === DEFAULT_MANIFEST_PATH) {
+      errors.push(...repositoryManifestErrors(manifest, pkg.version));
     }
   } catch (error) {
     errors.push(`cannot read or parse ${PACKAGE_JSON_PATH}: ${error.message}`);
