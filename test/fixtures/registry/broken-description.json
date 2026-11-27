@@ -11,10 +11,8 @@
   },
   "packages": [
     {
-      "registryType": "npm",
-      "identifier": "@opensmm/mcp-server",
-      "version": "0.1.0",
-      "runtimeHint": "npx",
+      "registryType": "mcpb",
+      "identifier": "https://github.com/opensmm-protocol/mcp-server/releases/download/v0.1.0/opensmm-mcp-server-0.1.0.mcpb",
       "transport": {
         "type": "stdio"
       }

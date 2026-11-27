@@ -77,37 +77,88 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+  # Publishes the MCP Bundle as a GitHub Release asset and then the registry
+  # entry that points to it. Independent of npm. A published asset or version is
+  # never replaced: a fix is a new version.
   registry:
     name: Publish to the MCP Registry
-    needs: npm
     runs-on: ubuntu-latest
     environment: release
     permissions:
-      contents: read
+      contents: write
       id-token: write
     steps:
-      - name: Check npm publish result
-        id: gate
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Verify release tag matches the package version
+        id: release
+        run: node scripts/check-release-version.mjs
+
+      - name: Install dependencies
+        if: steps.release.outputs.publish == 'true'
+        run: npm ci
+
+      - name: Build the MCP bundle
+        if: steps.release.outputs.publish == 'true'
+        run: npm run build:mcpb
+
+      - name: Attach the bundle to the GitHub Release
+        if: steps.release.outputs.publish == 'true'
         env:
-          NPM_PUBLISHED: ${{ needs.npm.outputs.published }}
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.release.outputs.version }}
         run: |
-          if [ "${NPM_PUBLISHED}" = "true" ]; then
-            echo "publish=true" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          asset="opensmm-mcp-server-${VERSION}.mcpb"
+          if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            # The second `view` covers a release created by someone else meanwhile.
+            gh release create "$GITHUB_REF_NAME" --verify-tag --title "$GITHUB_REF_NAME" --generate-notes ||
+              gh release view "$GITHUB_REF_NAME" >/dev/null
+          fi
+          assets="$(gh release view "$GITHUB_REF_NAME" --json assets --jq '.assets[].name')"
+          if grep -Fxq "$asset" <<<"$assets"; then
+            echo "::notice title=Release asset reused::${asset} is already attached to ${GITHUB_REF_NAME}; it is not replaced."
           else
-            echo "::notice title=MCP Registry publish skipped::npm publish did not run, so the registry entry would point to a version that does not exist."
-            echo "publish=false" >> "$GITHUB_OUTPUT"
+            gh release upload "$GITHUB_REF_NAME" "build/${asset}"
           fi
 
-      - name: Check out repository
-        if: steps.gate.outputs.publish == 'true'
-        uses: actions/checkout@v4
+      # No token: this is the download every registry user gets.
+      - name: Download the asset anonymously and smoke it
+        if: steps.release.outputs.publish == 'true'
+        run: |
+          set -euo pipefail
+          url="$(node -p 'require("./server.json").packages[0].identifier')"
+          file="${RUNNER_TEMP}/$(basename "$url")"
+          curl --fail --location --silent --show-error --retry 5 --retry-all-errors --output "$file" "$url"
+          node scripts/smoke-mcpb.mjs "$file"
+          node scripts/render-registry-manifest.mjs "$file" "${RUNNER_TEMP}/server.publish.json"
+
+      - name: Check whether this version is already listed
+        id: listed
+        if: steps.release.outputs.publish == 'true'
+        run: |
+          if node scripts/check-registry-entry.mjs "${RUNNER_TEMP}/server.publish.json"; then
+            echo "listed=true" >> "$GITHUB_OUTPUT"
+            echo "::notice title=MCP Registry publish skipped::this version is already listed with this identifier and hash."
+          else
+            echo "listed=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Install cosign
-        if: steps.gate.outputs.publish == 'true'
+        if: steps.release.outputs.publish == 'true' && steps.listed.outputs.listed != 'true'
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
       - name: Download and verify mcp-publisher
-        if: steps.gate.outputs.publish == 'true'
+        if: steps.release.outputs.publish == 'true' && steps.listed.outputs.listed != 'true'
         run: |
           set -euo pipefail
           os="$(uname -s | tr '[:upper:]' '[:lower:]')"
@@ -127,9 +178,13 @@ jobs:
           ./mcp-publisher --version
 
       - name: Log in with GitHub OIDC
-        if: steps.gate.outputs.publish == 'true'
+        if: steps.release.outputs.publish == 'true' && steps.listed.outputs.listed != 'true'
         run: ./mcp-publisher login github-oidc
 
-      - name: Publish server.json
-        if: steps.gate.outputs.publish == 'true'
-        run: ./mcp-publisher publish
+      - name: Publish the manifest with the file hash
+        if: steps.release.outputs.publish == 'true' && steps.listed.outputs.listed != 'true'
+        run: ./mcp-publisher publish "${RUNNER_TEMP}/server.publish.json"
+
+      - name: Verify the registry lists this version
+        if: steps.release.outputs.publish == 'true'
+        run: node scripts/check-registry-entry.mjs "${RUNNER_TEMP}/server.publish.json" 12

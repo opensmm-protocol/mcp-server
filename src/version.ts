@@ -6,4 +6,4 @@
  * then `npm run manifests:sync` and this constant. `test/release-version.test.ts`
  * fails when this value drifts from `package.json` or `server.json`.
  */
-export const VERSION = "0.1.1";
+export const VERSION = "0.1.8";

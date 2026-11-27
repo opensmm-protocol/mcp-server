@@ -5,7 +5,7 @@
   "version": "0.1.0",
   "packages": [
     {
-      "identifier": "@opensmm/mcp-server"
+      "identifier": "https://github.com/opensmm-protocol/mcp-server/releases/download/v0.1.0/opensmm-mcp-server-0.1.0.mcpb"
     }
   ]
 }
