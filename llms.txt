@@ -25,7 +25,7 @@ Guides on opensmm.dev:
 
 ## Key facts for agents
 
-- Install: from source — `git clone https://github.com/opensmm-protocol/mcp-server.git && cd mcp-server && npm ci && npm run gateway` (REST /v0 + MCP /mcp on :8080, Node.js >= 22.18, no API key needed); Docker from the same checkout — `git clone https://github.com/opensmm-protocol/mcp-server.git && cd mcp-server && docker build -t opensmm-gateway . && docker run -d --name opensmm -p 127.0.0.1:8080:8080 -v opensmm-data:/data opensmm-gateway`. No npm package and no public image exist, none is planned: the checkout is the install source. No public remote endpoint yet: run the node locally.
+- Install: from source — `git clone https://github.com/opensmm-protocol/mcp-server.git && cd mcp-server && npm ci && npm run gateway` (REST /v0 + MCP /mcp on :8080, Node.js >= 22.18, no API key needed); Docker from the same checkout — `git clone https://github.com/opensmm-protocol/mcp-server.git && cd mcp-server && docker build -t opensmm-gateway . && docker run -d --name opensmm -p 127.0.0.1:8080:8080 -v opensmm-data:/data opensmm-gateway`. No npm package and no public image exist, none is planned: a node is installed from the checkout. The MCP stdio server alone is also available as an `.mcpb` bundle (see «MCP Registry» under Docs). No public remote endpoint yet: run the node locally.
 - Public node without a domain (quick tunnel): expose local node with Cloudflare quick tunnel and verify with `npm run verify:node -- <https-url>` — docs/NODES.md («Public URL without a custom domain»).
 - Protocol version: 0.1.0, URL prefix /v0.
 - One rule: the same operation via REST and MCP yields the same domain
@@ -90,4 +90,4 @@ SUSPENDED providers never appear.
 - Provider onboarding (incl. a copy-paste AI prompt): docs/PROVIDER_ONBOARDING.md
 - Node census & quick tunnel (no domain): docs/NODES.md
 - Gateway deployment & production TLS (Caddy): docs/DEPLOY.md
-- MCP Registry: no entry (no published package, no public remote) — docs/REGISTRY.md
+- MCP Registry: `io.github.opensmm-protocol/mcp-server`; install the `.mcpb` bundle from the GitHub Release (https://github.com/opensmm-protocol/mcp-server/releases/download/v0.1.8/opensmm-mcp-server-0.1.8.mcpb) — MCP over stdio on a mock catalog (no real services, orders or payments), Node.js >= 22.18, no keys; SHA-256 check — docs/REGISTRY.md

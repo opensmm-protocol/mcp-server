@@ -251,12 +251,12 @@ Caddy issues and renews the certificate automatically. Agents then connect
 to `https://mcp.opensmm.dev/mcp` (Streamable HTTP, stateless, CORS-open);
 REST is available on the same host under `/v0`.
 
-The project has no MCP Registry entry: no package is published and OpenSMM hosts
-no public MCP endpoint of its own, so the registry schema cannot describe the
-project itself; OpenSMM is installed from source (see «Run a node in 5 minutes»
-above). A node an operator exposes like this is theirs to publish — schema
-`2025-12-11` describes it under `remotes` pointing at `https://mcp.opensmm.dev/mcp`.
-Details: [`REGISTRY.md`](./REGISTRY.md).
+The project is listed in the official MCP Registry as
+`io.github.opensmm-protocol/mcp-server`. The entry points to an `.mcpb` bundle
+(MCP over stdio, mock catalog), not to a running node: OpenSMM hosts no public
+MCP endpoint of its own. A node an operator exposes like this is theirs to
+publish under their own name — schema `2025-12-11` describes it under `remotes`
+with the node's public `/mcp` URL. Details: [`REGISTRY.md`](./REGISTRY.md).
 
 ## Environment
 
@@ -289,13 +289,18 @@ Details: [`REGISTRY.md`](./REGISTRY.md).
 ## Release version and tag
 
 The release version has one source: `version` in `package.json`. A bump touches
-`package.json`, `src/version.ts` and both `version` fields of `server.json`; then
-`npm run manifests:sync` mirrors `server.json` into `mcp.json` and
+`package.json`, `package-lock.json`, `src/version.ts` and, in `server.json`, the
+`version` field and the version in `packages[0].identifier` (tag and file name);
+then `npm run manifests:sync` mirrors `server.json` into `mcp.json` and
 `website/mcp.json`. `npm test` fails when any of these values drift.
 
 A tag `vX.Y.Z` marks the merge commit of a release and does not depend on
-publishing: when the tag and the package version differ, `registry-publish.yml`
-skips npm and the registry with a notice and the run stays green. The release
+publishing. To publish to the MCP Registry, the tag must equal the package
+version: when they differ, `registry-publish.yml` skips npm and the registry with
+a notice and the run stays green. A green run is therefore not proof of
+publication; check the registry API ([`REGISTRY.md`](./REGISTRY.md)). A release
+asset and a published registry version are never replaced: a fix is a new
+version, and reverting a merge does not remove a registry entry. The release
 manager orders the bump in the release card of the window and a coder ships it as
 a separate PR before the release; a release without a bump still ships, but gets
 no new tag.
