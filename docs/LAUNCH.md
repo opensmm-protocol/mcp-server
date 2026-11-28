@@ -18,7 +18,8 @@ What it does differently:
 - Direct settlement is canonical: orders carry x402 payment requirements (USDC on Base) with the provider's own payout address as payTo. A gateway routes and measures; it never custodies funds.
 
 Repo: https://github.com/opensmm-protocol/mcp-server (spec + reference gateway, 86 tests, MIT)
-Run it from source: `git clone https://github.com/opensmm-protocol/mcp-server.git && cd mcp-server && npm ci && npm run gateway` (no npm package — the checkout is the install)
+Run it from source: `git clone https://github.com/opensmm-protocol/mcp-server.git && cd mcp-server && npm ci && npm run gateway` (no npm package).
+The MCP Registry also lists the MCP stdio server alone as `io.github.opensmm-protocol/mcp-server` (an `.mcpb` bundle on a mock catalog: no real services, orders or payments).
 
 Happy to answer questions about the x402 flow, the provider SPI, or why payment and execution are separate state machines.
 
@@ -36,7 +37,8 @@ Repo: https://github.com/opensmm-protocol/mcp-server
 - Direct settlement: agents pay providers in USDC on Base via x402; the gateway never touches funds
 - Spec-first: JSON Schemas for every model, 8 runnable examples, 86 tests
 
-Agents can run it as an MCP server from source: `git clone https://github.com/opensmm-protocol/mcp-server.git && cd mcp-server && npm ci && npm run gateway` (no npm package — the checkout is the install).
+Agents can run it as an MCP server from source: `git clone https://github.com/opensmm-protocol/mcp-server.git && cd mcp-server && npm ci && npm run gateway` (no npm package).
+The MCP Registry also lists the MCP stdio server alone as `io.github.opensmm-protocol/mcp-server` (an `.mcpb` bundle on a mock catalog: no real services, orders or payments).
 Feedback welcome — especially on the spec (spec/v0) and the provider SPI.
 
 ## X/Twitter thread (3 posts)

@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 /**
- * OpenSMM entry point for the published package. Requires Node.js >= 22.18.
+ * OpenSMM entry point for a source checkout and the `.mcpb` bundle.
+ * Requires Node.js >= 22.18. From a checkout, after `npm ci`:
  *
- *   npx -y @opensmm/mcp-server                  MCP server over stdio (default)
- *   npx -y @opensmm/mcp-server gateway ...      one node: REST /v0 + MCP /mcp
- *   npx -y @opensmm/mcp-server doctor ...       pre-onboarding panel check
+ *   node bin/opensmm.mjs                  MCP server over stdio (default)
+ *   node bin/opensmm.mjs gateway ...      one node: REST /v0 + MCP /mcp
+ *   node bin/opensmm.mjs doctor ...       pre-onboarding panel check
  *
  * Modules come from `dist/` (built by `npm run build`, wired into `prepack`):
  * Node refuses native TypeScript type stripping for files under node_modules,
@@ -14,7 +15,7 @@
 import { existsSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-const USAGE = `Usage: opensmm [command]
+const USAGE = `Usage: node bin/opensmm.mjs [command]
 
 Commands:
   (none)                 MCP server over stdio (default; keep the old behaviour)
@@ -33,10 +34,10 @@ Doctor options:
   --profile <name>       Expected profile name (default: standard)
   -h, --help             Show this help
 
-Examples:
-  npx -y @opensmm/mcp-server gateway --port 8080
-  npx -y @opensmm/mcp-server gateway --port 8080 --state ./opensmm-state.json
-  OPENSMM_PANEL_KEY=<key> npx -y @opensmm/mcp-server doctor --url https://panel.example/api/v2
+Examples (from a source checkout, after \`npm ci\`):
+  node bin/opensmm.mjs gateway --port 8080
+  node bin/opensmm.mjs gateway --port 8080 --state ./opensmm-state.json
+  OPENSMM_PANEL_KEY=<key> node bin/opensmm.mjs doctor --url https://panel.example/api/v2
 
 No keys and no external services are required to boot a node: the node boots on
 the built-in mock catalog. Docs: docs/DEPLOY.md («Run a node in 5 minutes»).
